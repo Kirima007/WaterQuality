@@ -1,0 +1,64 @@
+#pragma once
+#include <Arduino.h>
+#include "shared.h"
+#include "NVSManager.h"
+#include "SoundManager.h"
+
+// ทุก State ของโปรแกรม
+enum class AppState {
+    STARTUP,
+    MAIN_SCREEN,
+    MAIN_MENU,
+    READ_TEMP,
+    READ_GPS,
+    THRESH_MENU,
+    EDIT_THRESH,
+    CAL_DI,
+    CAL_SALT,
+    CAL_FINISH,
+    CAL_CANCEL_CONFIRM
+};
+
+class StateMachine {
+public:
+    StateMachine();
+
+    // เรียกจาก DisplayTask ทุก loop
+    void handleEvent(ButtonEvent ev);
+    void begin();
+
+    // State ปัจจุบัน
+    AppState getState()  const { return _current; }
+    AppState getPrev()   const { return _prev; }
+    bool     hasChanged();  // true ครั้งแรกที่อ่าน แล้ว reset
+
+    // ข้อมูลที่ ScreenManager ต้องการ
+    int  menuIndex      = 0;
+    int  cancelSelect   = 1;   // 0=YES, 1=NO
+    char editingColor   = 'G'; // 'G' หรือ 'R'
+
+    // ค่า calibration ชั่วคราว (ก่อนกด confirm)
+    float tmp_v_di   = 0.0f;
+    float tmp_v_salt = 0.0f;
+    float tmp_t_salt = 0.0f;
+
+private:
+    AppState _current;
+    AppState _prev;
+    AppState _lastCalState;  // จำไว้ว่าอยู่ขั้นไหนก่อน cancel
+    bool     _changed;
+
+    void _goTo(AppState next);
+
+    // Handler แต่ละ State
+    void _handleMainScreen(ButtonEvent ev);
+    void _handleMainMenu(ButtonEvent ev);
+    void _handleReadTemp(ButtonEvent ev);
+    void _handleReadGPS(ButtonEvent ev);
+    void _handleThreshMenu(ButtonEvent ev);
+    void _handleEditThresh(ButtonEvent ev);
+    void _handleCalDI(ButtonEvent ev, const SensorData& sensor);
+    void _handleCalSalt(ButtonEvent ev, const SensorData& sensor);
+    void _handleCalFinish();
+    void _handleCalCancelConfirm(ButtonEvent ev);
+};
