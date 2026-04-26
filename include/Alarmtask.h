@@ -7,7 +7,7 @@
 #include "StateMachine.h"
 #include "config.h"
 
-#define ALARM_TASK_DELAY_MS  200
+#define ALARM_TASK_DELAY_MS  300
 #define ALARM_TASK_STACK     2048
 #define ALARM_TASK_PRIORITY  2
 #define ALARM_TASK_CORE      0

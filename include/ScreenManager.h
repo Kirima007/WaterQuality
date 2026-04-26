@@ -42,8 +42,13 @@ private:
     void _drawEditThresh();
     void _drawCalDI();
     void _drawCalSalt();
-    void _drawCalFinish();
+    void _drawCalFinish(); 
+
+    
     void _drawCalCancelConfirm();
+    void _drawSimStatus();
+    void _drawSimSending(); 
+    void _drawSimResult();
 
     // Helper: พิมพ์ตัวเลขให้ชิดขวาในความกว้างที่กำหนด
     void _printPadded(float val, int decimals, int width);

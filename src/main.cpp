@@ -11,6 +11,7 @@
 #include "StateMachine.h"
 #include "ScreenManager.h"
 #include "AlarmTask.h"
+#include "Sim.h"
 
 // ==========================================
 // Objects
@@ -96,6 +97,12 @@ void setup() {
         ALARM_TASK_STACK, &alarmTask,
         ALARM_TASK_PRIORITY, nullptr, ALARM_TASK_CORE
     );
+        xTaskCreatePinnedToCore(
+        SimTask::taskEntry, "SIM",
+        SIM_TASK_STACK, &stateMachine,
+        SIM_TASK_PRIORITY, nullptr, SIM_TASK_CORE
+    );
+
 
     // --- Core 1: UI ---
     xTaskCreatePinnedToCore(
@@ -116,13 +123,6 @@ void setup() {
         2, nullptr, 1             // Priority กลางๆ รันบน Core 1
     );
 
-    // --- SimTask (เปิด/ปิดตรงนี้) ---
-    // comment ออกถ้ายังไม่พร้อมใช้ SIM
-    // xTaskCreatePinnedToCore(
-    //     SimTask::taskEntry, "SIM",
-    //     SIM_TASK_STACK, nullptr,
-    //     SIM_TASK_PRIORITY, nullptr, SIM_TASK_CORE
-    // );
 }
 
 void loop() {
@@ -131,4 +131,4 @@ void loop() {
 
 
 
-//made by weerapat ref by p.try
+//made by Weerapat C. 2026

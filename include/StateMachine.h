@@ -16,7 +16,10 @@ enum class AppState {
     CAL_DI,
     CAL_SALT,
     CAL_FINISH,
-    CAL_CANCEL_CONFIRM
+    CAL_CANCEL_CONFIRM,
+    SIM_STATUS,
+    SIM_SENDING,
+    SIM_RESULT,
 };
 
 class StateMachine {
@@ -42,6 +45,13 @@ public:
     float tmp_v_salt = 0.0f;
     float tmp_t_salt = 0.0f;
 
+    bool simLastSuccess  = false;
+    int  simLastHttpCode = 0;
+
+    // SimTask เรียกเมื่อส่งเสร็จ
+    void onSimSendComplete(bool success, int httpCode);
+
+
 private:
     AppState _current;
     AppState _prev;
@@ -61,4 +71,7 @@ private:
     void _handleCalSalt(ButtonEvent ev, const SensorData& sensor);
     void _handleCalFinish();
     void _handleCalCancelConfirm(ButtonEvent ev);
+    void _handleSimStatus(ButtonEvent ev);
+    void _handleSimSending(ButtonEvent ev);
+    void _handleSimResult(ButtonEvent ev);
 };

@@ -1,5 +1,5 @@
 #include "StateMachine.h"
-
+#include "Sim.h"
 // ==========================================
 // Constructor
 // ==========================================
@@ -55,6 +55,9 @@ void StateMachine::handleEvent(ButtonEvent ev) {
         case AppState::CAL_SALT:            _handleCalSalt(ev, sensor);         break;
         case AppState::CAL_FINISH:          _handleCalFinish();                 break;
         case AppState::CAL_CANCEL_CONFIRM:  _handleCalCancelConfirm(ev);        break;
+        case AppState::SIM_STATUS:          _handleSimStatus(ev);               break;
+        case AppState::SIM_SENDING:         _handleSimSending(ev);              break;
+        case AppState::SIM_RESULT:          _handleSimResult(ev);               break;
         default: break;
     }
 }
@@ -66,6 +69,9 @@ void StateMachine::_handleMainScreen(ButtonEvent ev) {
     if (ev == ButtonEvent::SHORT_PRESS) {
         menuIndex = 0;
         _goTo(AppState::MAIN_MENU);
+    }
+    else if (ev == ButtonEvent::LONG_PRESS) {
+        _goTo(AppState::SIM_STATUS);
     }
 }
 
@@ -223,4 +229,41 @@ void StateMachine::_handleCalCancelConfirm(ButtonEvent ev) {
             _goTo(_lastCalState);
         }
     }
+}
+
+// ==========================================
+// SIM_STATUS, SIM_SENDING, SIM_RESULT
+// ==========================================
+void StateMachine::_handleSimStatus(ButtonEvent ev) {
+    if (ev == ButtonEvent::SHORT_PRESS) {
+        requestSound(SoundEvent::BACK);
+        _goTo(AppState::MAIN_SCREEN);
+
+    }
+    else if (ev == ButtonEvent::LONG_PRESS) {
+        SimTask::requestSend();
+        _goTo(AppState::SIM_SENDING);
+    }
+}
+void StateMachine::_handleSimSending(ButtonEvent ev) {
+    // กดปุ่มไหนก็ได้ขณะส่ง → ยกเลิกกลับหน้าเดิม
+    if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
+        requestSound(SoundEvent::BACK);
+        _goTo(AppState::MAIN_SCREEN);
+    }
+}
+
+void StateMachine::_handleSimResult(ButtonEvent ev) {
+    if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
+        requestSound(SoundEvent::BACK);
+        _goTo(AppState::MAIN_SCREEN);
+    }
+}
+
+void StateMachine::onSimSendComplete(bool success, int httpCode) {
+    simLastSuccess  = success;
+    simLastHttpCode = httpCode;
+    if (success) requestSound(SoundEvent::SUCCESS);
+    else         requestSound(SoundEvent::BACK);
+    _goTo(AppState::SIM_RESULT);
 }

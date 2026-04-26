@@ -1,4 +1,5 @@
 #include "ScreenManager.h"
+#include "Sim.h"
 
 // ==========================================
 // Constructor
@@ -41,6 +42,10 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::CAL_SALT:             self->_drawCalSalt();           break;
             case AppState::CAL_FINISH:           self->_drawCalFinish();         break;
             case AppState::CAL_CANCEL_CONFIRM:   self->_drawCalCancelConfirm();  break;
+            case AppState::SIM_STATUS:          self->_drawSimStatus();        break;
+            case AppState::SIM_SENDING:         self->_drawSimSending();       break;
+            case AppState::SIM_RESULT:          self->_drawSimResult();        break;
+
         }
 
         vTaskDelay(pdMS_TO_TICKS(DISPLAY_TASK_DELAY_MS));
@@ -260,4 +265,61 @@ void ScreenManager::_drawCalCancelConfirm() {
     } else {
         _lcd.print("  YES        > NO  ");
     }
+}
+
+void ScreenManager::_drawSimStatus() {
+    _lcd.setCursor(0, 0);
+    _lcd.print("--- Send Data ---   ");
+ 
+    // แถว 1: สถานะ SIM
+    _lcd.setCursor(0, 1);
+    if (SimTask::isConnected()) {
+        _lcd.print("SIM : Connected  OK ");
+    } else {
+        _lcd.print("SIM : Connecting... ");
+    }
+ 
+    // แถว 2: สถานะ GPS
+    _lcd.setCursor(0, 2);
+    if (_gps.valid) {
+        _lcd.print("GPS : Lock  ");
+        _lcd.print(_gps.satellites);
+        _lcd.print(" sat      ");
+    } else {
+        _lcd.print("GPS : No Lock...    ");
+    }
+ 
+    // แถว 3: ค่า Sensor + คำแนะนำ
+    _lcd.setCursor(0, 3);
+    _lcd.print("S:");
+    _lcd.print(_sensor.currentPPT, 1);
+    _lcd.print("ppt T:");
+    _lcd.print(_sensor.currentTemp, 1);
+    _lcd.print("C  ");
+}
+
+
+void ScreenManager::_drawSimSending() {
+    _lcd.setCursor(0, 0); _lcd.print("--- Sending... ---  ");
+    _lcd.setCursor(0, 1); _lcd.print(" Uploading data...  ");
+    _lcd.setCursor(0, 2); _lcd.print(" Please wait...     ");
+    _lcd.setCursor(0, 3); _lcd.print("                    ");
+}
+
+void ScreenManager::_drawSimResult() {
+    _lcd.setCursor(0, 0); _lcd.print("--- Result ---      ");
+    if (_sm.simLastSuccess) {
+        _lcd.setCursor(0, 1); _lcd.print(" Send Success!  OK  ");
+        _lcd.setCursor(0, 2);
+        _lcd.print(" HTTP: ");
+        _lcd.print(_sm.simLastHttpCode);
+        _lcd.print("              ");
+    } else {
+        _lcd.setCursor(0, 1); _lcd.print(" Send Failed!  X    ");
+        _lcd.setCursor(0, 2);
+        _lcd.print(" HTTP: ");
+        _lcd.print(_sm.simLastHttpCode);
+        _lcd.print("              ");
+    }
+    _lcd.setCursor(0, 3); _lcd.print(" Click to go back   ");
 }

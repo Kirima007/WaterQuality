@@ -1,91 +1,112 @@
-// ต้อง define modem type ก่อน include TinyGSM เสมอ
 #define TINY_GSM_MODEM_SIM800
 
 #include "Sim.h"
+#include "StateMachine.h"
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
 #include <ArduinoJson.h>
 
 // ==========================================
+// Static Members
+// ==========================================
+volatile bool SimTask::_connected    = false;
+volatile bool SimTask::_sendRequested = false;
+
+bool SimTask::isConnected()  { return _connected; }
+void SimTask::requestSend()  { _sendRequested = true; }
+
+// ==========================================
 // FreeRTOS Task Entry Point
 // ==========================================
 void SimTask::taskEntry(void* param) {
+    disableCore0WDT();
+    StateMachine* sm = static_cast<StateMachine*>(param);
 
-    // --- เปิดไฟ SIM800L ---
+    // --- เปิด SIM800L ---
     pinMode(MODEM_POWER_ON, OUTPUT);
     digitalWrite(MODEM_POWER_ON, HIGH);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    // --- UART1 สำหรับ SIM800L ---
     HardwareSerial simSerial(1);
     simSerial.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
-    vTaskDelay(pdMS_TO_TICKS(3000));  // รอ modem boot
+    vTaskDelay(pdMS_TO_TICKS(3000));
 
     TinyGsm modem(simSerial);
     modem.restart();
     vTaskDelay(pdMS_TO_TICKS(2000));
 
-    // --- เชื่อมต่อ GPRS (วนจนสำเร็จ) ---
-    while (!modem.gprsConnect(SIM_APN, "", "")) {
-        vTaskDelay(pdMS_TO_TICKS(5000));
-    }
+    // --- รอจับสัญญาณ ---
+    modem.waitForNetwork(60000L);
+
+    // --- เชื่อมต่อ GPRS ---
+    modem.gprsConnect(SIM_APN, "", "");
+    _connected = modem.isGprsConnected();
 
     // ==========================================
     // Main Loop
     // ==========================================
     SensorData sensor{};
     GPSData    gps{};
-    String     response;
 
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(SIM_PUBLISH_MS));
-
-        // --- เช็ค GPRS ยังต่ออยู่ไหม ---
-        if (!modem.isGprsConnected()) {
+        // อัปเดตสถานะ GPRS ทุก loop
+        _connected = modem.isGprsConnected();
+        if (!_connected) {
             modem.gprsConnect(SIM_APN, "", "");
-            vTaskDelay(pdMS_TO_TICKS(3000));
-            continue;
+            _connected = modem.isGprsConnected();
         }
 
-        // --- ดึงข้อมูลล่าสุดจาก Queue ---
-        xQueuePeek(sensorQueue, &sensor, 0);
-        xQueuePeek(gpsQueue,    &gps,    0);
+        // รอ requestSend จาก StateMachine
+        if (_sendRequested) {
+            _sendRequested = false;
 
-        // --- สร้าง JSON และส่ง HTTP ---
-        String payload = _buildJson(sensor, gps);
+            // ดึงข้อมูลล่าสุด
+            xQueuePeek(sensorQueue, &sensor, 0);
+            xQueuePeek(gpsQueue,    &gps,    0);
 
-        // สร้าง client ใหม่ทุกครั้ง (หลีกเลี่ยง connection hang)
-        TinyGsmClient gsmClient(modem);
-        HttpClient    http(gsmClient, HTTP_HOST, HTTP_PORT);
-        http.setTimeout(5000);
+            String payload  = _buildJson(sensor, gps);
+            String response = "";
+            int    httpCode = 0;
+            bool   success  = false;
 
-        http.beginRequest();
-        http.post(HTTP_PATH);
-        http.sendHeader("Content-Type", "application/json");
-        http.sendHeader("Accept",       "application/json");
-        http.sendHeader("Connection",   "close");
-        http.sendHeader("Content-Length", payload.length());
-        http.beginBody();
-        http.print(payload);
-        http.endRequest();
+            if (_connected) {
+                // สร้าง client ใหม่ทุกครั้ง
+                TinyGsmClient gsmClient(modem);
+                HttpClient    http(gsmClient, HTTP_HOST, HTTP_PORT);
+                http.setTimeout(5000);
 
-        int httpCode = http.responseStatusCode();
-        response     = http.responseBody();
+                http.beginRequest();
+                http.post(HTTP_PATH);
+                http.sendHeader("Content-Type",   "application/json");
+                http.sendHeader("Accept",          "application/json");
+                http.sendHeader("Connection",      "close");
+                http.sendHeader("Content-Length",  payload.length());
+                http.beginBody();
+                http.print(payload);
+                http.endRequest();
 
-        http.stop();
-        gsmClient.stop();
+                httpCode = http.responseStatusCode();
+                response = http.responseBody();
+                success  = (httpCode >= 200 && httpCode < 300);
+
+                http.stop();
+                gsmClient.stop();
+            } else {
+                // ไม่ได้ต่อ internet → แจ้ง fail ทันที
+                httpCode = 0;
+                success  = false;
+            }
+
+            // แจ้ง StateMachine ว่าส่งเสร็จแล้ว
+            sm->onSimSendComplete(success, httpCode);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
 // ==========================================
 // สร้าง JSON Payload
-// รูปแบบ:
-// {
-//   "id": 1,
-//   "salinity": 15.23,
-//   "temp": 28.5,
-//   "address": { "x": "13.736717", "y": "100.523186" }
-// }
 // ==========================================
 String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonDocument doc;
@@ -94,7 +115,6 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     doc["salinity"] = serialized(String(sensor.currentPPT,  2));
     doc["temp"]     = serialized(String(sensor.currentTemp, 1));
 
-    // GPS address
     JsonObject address = doc["address"].to<JsonObject>();
     if (gps.valid) {
         address["x"] = String(gps.lat, 6);
