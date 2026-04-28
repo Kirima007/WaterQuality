@@ -86,11 +86,11 @@ void setup() {
         GPS_TASK_PRIORITY, nullptr, GPS_TASK_CORE
     );
 
-    xTaskCreatePinnedToCore(
-        SoundManager::taskEntry, "Sound",
-        2048, &soundMgr,
-        1, nullptr, 0
-    );
+    // xTaskCreatePinnedToCore(
+    //     SoundManager::taskEntry, "Sound",
+    //     2048, &soundMgr,
+    //     1, nullptr, 0
+    // );
 
     xTaskCreatePinnedToCore(
         AlarmTask::taskEntry, "Alarm",

@@ -9,9 +9,9 @@
 // ตั้งค่า Server
 // ==========================================
 #define SIM_APN         "internet"        // APN ของซิม (DTAC=internet, True=true, AIS=ais)
-#define HTTP_HOST       "webhook.site" // โฮสต์ปลายทาง
+#define HTTP_HOST       "161.246.157.210" // โฮสต์ปลายทาง
 #define HTTP_PORT       80                // พอร์ต
-#define HTTP_PATH       "/027e8620-29dd-44a2-9a06-f3e3e05ea36a"     // endpoint
+#define HTTP_PATH       "/api/data"     // endpoint
 #define DEVICE_ID       1                 // ID ของเครื่องนี้
 #define SIM_PUBLISH_MS  30000             // ส่งทุก 30 วิ
 
@@ -31,12 +31,15 @@ class SimTask {
 public:
     static void taskEntry(void* param);
     static bool isConnected();  // SIM/GPRS ต่ออยู่ไหม
+    static int  getSignalQuality();
     static void requestSend(); // เรียกจาก StateMachine เมื่ออยากส่งข้อมูล
+    
 
 
 private:
     static volatile bool _connected;
     static volatile bool _sendRequested;
+    static volatile int  _csq;
 
     // สร้าง JSON payload
     static String _buildJson(const SensorData& sensor, const GPSData& gps);

@@ -270,26 +270,31 @@ void ScreenManager::_drawCalCancelConfirm() {
 void ScreenManager::_drawSimStatus() {
     _lcd.setCursor(0, 0);
     _lcd.print("--- Send Data ---   ");
- 
-    // แถว 1: สถานะ SIM
+
+    // แถว 1: สถานะ SIM + Signal Quality
     _lcd.setCursor(0, 1);
-    if (SimTask::isConnected()) {
-        _lcd.print("SIM : Connected  OK ");
+    int sig = SimTask::getSignalQuality();
+    if (!SimTask::isConnected()) {
+        _lcd.print("SIM : No Network... ");
+    } else if (sig == 99 || sig == 0) {
+        _lcd.print("SIM : No Signal  99 ");
     } else {
-        _lcd.print("SIM : Connecting... ");
+        _lcd.print("SIM : OK (");
+        _lcd.print(sig);
+        _lcd.print("/31)");
     }
- 
+
     // แถว 2: สถานะ GPS
     _lcd.setCursor(0, 2);
     if (_gps.valid) {
         _lcd.print("GPS : Lock  ");
         _lcd.print(_gps.satellites);
-        _lcd.print(" sat      ");
+        _lcd.print("sat        ");
     } else {
         _lcd.print("GPS : No Lock...    ");
     }
- 
-    // แถว 3: ค่า Sensor + คำแนะนำ
+
+    // แถว 3: ค่า Sensor
     _lcd.setCursor(0, 3);
     _lcd.print("S:");
     _lcd.print(_sensor.currentPPT, 1);

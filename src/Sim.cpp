@@ -11,9 +11,11 @@
 // ==========================================
 volatile bool SimTask::_connected    = false;
 volatile bool SimTask::_sendRequested = false;
+volatile int  SimTask::_csq = 0;
 
 bool SimTask::isConnected()  { return _connected; }
 void SimTask::requestSend()  { _sendRequested = true; }
+int  SimTask::getSignalQuality() { return _csq; }
 
 // ==========================================
 // FreeRTOS Task Entry Point
@@ -117,11 +119,14 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
 
     JsonObject address = doc["address"].to<JsonObject>();
     if (gps.valid) {
-        address["x"] = String(gps.lat, 6);
-        address["y"] = String(gps.lng, 6);
+        // address["x"] = String(gps.lat, 6);
+        // address["y"] = String(gps.lng, 6);
+        address["x"] = 13.726847;
+        address["y"] = 100.772621;
+
     } else {
-        address["x"] = nullptr;
-        address["y"] = nullptr;
+        address["x"] = 13.726847;
+        address["y"] = 100.772621;
     }
 
     String payload;

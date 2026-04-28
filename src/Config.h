@@ -12,4 +12,4 @@
 #define GPS_RX 19
 #define GPS_TX 25
 
-#define STARTUP_DELAY_MS 2000   // หน้า startup แสดงกี่ ms
+#define STARTUP_DELAY_MS 1500   // หน้า startup แสดงกี่ ms
