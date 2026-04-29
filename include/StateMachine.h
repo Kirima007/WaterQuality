@@ -13,6 +13,9 @@ enum class AppState {
     READ_GPS,
     THRESH_MENU,
     EDIT_THRESH,
+    CAL_MENU, // new
+    CAL_MANUAL, // new
+    EDIT_CAL_MANUAL, // new
     CAL_DI,
     CAL_SALT,
     CAL_FINISH,
@@ -42,6 +45,7 @@ public:
 
     // ค่า calibration ชั่วคราว (ก่อนกด confirm)
     float tmp_v_di   = 0.0f;
+    float tmp_t_di   = 0.0f;
     float tmp_v_salt = 0.0f;
     float tmp_t_salt = 0.0f;
 
@@ -60,6 +64,7 @@ private:
 
     void _goTo(AppState next);
 
+    bool _captureStableValue(float &capturedVolt, float &capturedTemp);
     // Handler แต่ละ State
     void _handleMainScreen(ButtonEvent ev);
     void _handleMainMenu(ButtonEvent ev);
@@ -67,6 +72,9 @@ private:
     void _handleReadGPS(ButtonEvent ev);
     void _handleThreshMenu(ButtonEvent ev);
     void _handleEditThresh(ButtonEvent ev);
+    void _handleCalMenu(ButtonEvent ev); // new
+    void _handleCalManual(ButtonEvent ev, const SensorData& sensor);
+    void _handleEditCalManual(ButtonEvent ev);
     void _handleCalDI(ButtonEvent ev, const SensorData& sensor);
     void _handleCalSalt(ButtonEvent ev, const SensorData& sensor);
     void _handleCalFinish();

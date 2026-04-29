@@ -7,6 +7,9 @@ struct CalibData {
     float v_di   = 0.0004f;  // แรงดัน DI water
     float v_salt = 0.4746f;  // แรงดัน 35ppt solution
     float t_salt = 23.50f;   // อุณหภูมิตอน calibrate
+
+    float alpha = 1.0f; 
+    float beta  = 0.0f;
 };
 
 // ข้อมูล Threshold
@@ -43,4 +46,6 @@ private:
     static const char* KEY_T_SALT;
     static const char* KEY_THRESH_G;
     static const char* KEY_THRESH_R;
+    static const char* KEY_ALPHA;
+    static const char* KEY_BETA;
 };

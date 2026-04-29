@@ -1,4 +1,5 @@
 #include "StateMachine.h"
+#include "SalinityCalc.h"
 #include "Sim.h"
 // ==========================================
 // Constructor
@@ -51,6 +52,9 @@ void StateMachine::handleEvent(ButtonEvent ev) {
         case AppState::READ_GPS:            _handleReadGPS(ev);                 break;
         case AppState::THRESH_MENU:         _handleThreshMenu(ev);              break;
         case AppState::EDIT_THRESH:         _handleEditThresh(ev);              break;
+        case AppState::CAL_MENU:            _handleCalMenu(ev);                 break;
+        case AppState::CAL_MANUAL:          _handleCalManual(ev, sensor);       break;
+        case AppState::EDIT_CAL_MANUAL:     _handleEditCalManual(ev);           break;
         case AppState::CAL_DI:              _handleCalDI(ev, sensor);           break;
         case AppState::CAL_SALT:            _handleCalSalt(ev, sensor);         break;
         case AppState::CAL_FINISH:          _handleCalFinish();                 break;
@@ -93,7 +97,9 @@ void StateMachine::_handleMainMenu(ButtonEvent ev) {
                 menuIndex = 0;
                 _goTo(AppState::THRESH_MENU);
                 break;
-            case 3: _goTo(AppState::CAL_DI);      break;
+            case 3: 
+                menuIndex = 0;
+                _goTo(AppState::CAL_MENU);      break;
             case 4: _goTo(AppState::MAIN_SCREEN);  break;
         }
     }
@@ -172,13 +178,133 @@ void StateMachine::_handleEditThresh(ButtonEvent ev) {
     }
 }
 
+void StateMachine::_handleCalMenu(ButtonEvent ev) {
+    if (ev == ButtonEvent::ROTATE_CW) {
+        requestSound(SoundEvent::SCROLL);
+        menuIndex = (menuIndex + 1) % 3;
+    } else if (ev == ButtonEvent::ROTATE_CCW) {
+        requestSound(SoundEvent::SCROLL);
+        menuIndex = (menuIndex - 1 + 3) % 3;
+    } else if (ev == ButtonEvent::SHORT_PRESS) {
+        switch (menuIndex) {
+            case 0:
+                _goTo(AppState::CAL_DI);
+                break;
+            case 1:
+                menuIndex = 0;
+                _goTo(AppState::CAL_MANUAL);
+                break;
+            case 2:
+                menuIndex = 3;
+                _goTo(AppState::MAIN_MENU);
+                break;
+        }
+    }
+}
+
+void StateMachine::_handleCalManual(ButtonEvent ev, const SensorData& sensor) {
+    if (ev == ButtonEvent::ROTATE_CW) {
+        requestSound(SoundEvent::SCROLL);
+        menuIndex = (menuIndex + 1) % 3; // 0=A, 1=B, 2=Save, 3=Back
+    } else if (ev == ButtonEvent::ROTATE_CCW) {
+        requestSound(SoundEvent::SCROLL);
+        menuIndex = (menuIndex - 1 + 3) % 3;
+    } else if (ev == ButtonEvent::SHORT_PRESS) {
+        switch (menuIndex) {
+            case 0: // เลือกปรับค่า A
+                editingColor = 'A'; // ยืมใช้ตัวแปรเดิมจำสถานะว่ากำลังแก้ A
+                _goTo(AppState::EDIT_CAL_MANUAL);
+                break;
+            case 1: // เลือกปรับค่า B
+                editingColor = 'B'; // จำสถานะว่ากำลังแก้ B
+                _goTo(AppState::EDIT_CAL_MANUAL);
+                break;
+            case 2: // Back
+                menuIndex = 0; // กลับไปชี้ที่เมนู "Manual Calibrate" 
+                _goTo(AppState::CAL_MENU);
+                break;
+        }
+    }
+}
+
+void StateMachine::_handleEditCalManual(ButtonEvent ev) {
+    if (ev == ButtonEvent::ROTATE_CW || ev == ButtonEvent::ROTATE_CCW) {
+        requestSound(SoundEvent::SCROLL);
+        
+        // ความละเอียดทีละ 0.001 (แบบ Manual Calibrate ของรุ่นพี่)
+        float step = (ev == ButtonEvent::ROTATE_CW) ? 0.001f : -0.001f;
+
+        if (editingColor == 'A') {
+            NVSManager::calib.alpha += step;
+            // ป้องกัน Alpha ติดลบหรือเป็นศูนย์ (เดี๋ยวเอาไปคูณแล้วค่าน้ำหายหมด)
+            if (NVSManager::calib.alpha < 0.001f) {
+                NVSManager::calib.alpha = 0.001f;
+            }
+        } else if (editingColor == 'B') {
+            NVSManager::calib.beta += step;
+        }
+    } 
+    else if (ev == ButtonEvent::SHORT_PRESS) {
+        // กดยืนยันการแก้ไข (แต่ยังไม่เซฟลง NVS) ให้กลับมาหน้าเลือกเมนู
+        requestSound(SoundEvent::SELECT);
+        
+        if (editingColor == 'A') {
+            // ถ้าเพิ่งแก้ Alpha เสร็จ ให้ไปชี้ที่ Beta ต่อ
+            menuIndex = 0; // ชี้ที่ "Beta"
+            NVSManager::saveCalib(); // เซฟค่าใหม่ลง NVS ทันที (เผื่อมีปัญหาแล้วต้องยกเลิกกลางคัน จะได้ไม่เสียของเก่า)
+            _goTo(AppState::CAL_MANUAL);
+        } else {            // ถ้าเพิ่งแก้ Beta เสร็จ ให้ไปชี้ที่ Save
+            menuIndex = 1; // ชี้ที่ "Save"
+            NVSManager::saveCalib(); // เซฟค่าใหม่ลง NVS ทันที (เผื่อมีปัญหาแล้วต้องยกเลิกกลางคัน จะได้ไม่เสียของเก่า)
+            _goTo(AppState::CAL_MANUAL);
+        }
+    }
+}
+
 // ==========================================
 // CAL_DI
 // ==========================================
+
+bool StateMachine::_captureStableValue(float &capturedVolt, float &capturedTemp) {
+    const int N = 5;
+    float bufVolt[N];
+    float sumVolt = 0.0f, sumTemp = 0.0f;
+    
+    for (int i = 0; i < N; i++) {
+        SensorData s;
+        xQueuePeek(sensorQueue, &s, 0); // ดึงค่าล่าสุดจาก SensorTask
+        bufVolt[i] = s.currentVolt;
+        sumVolt += s.currentVolt;
+        sumTemp += s.currentTemp;
+        
+        vTaskDelay(pdMS_TO_TICKS(500)); // หน่วงเวลาดึงค่าทีละ 0.5 วินาที
+    }
+    
+    float minV = bufVolt[0], maxV = bufVolt[0];
+    for (int i = 0; i < N; i++) {
+        if (bufVolt[i] < minV) minV = bufVolt[i];
+        if (bufVolt[i] > maxV) maxV = bufVolt[i];
+    }
+    
+    // ถ้าระหว่าง 2.5 วินาทีที่ผ่านมา แรงดันแกว่งเกิน 0.05V ถือว่าน้ำยังไม่นิ่ง!
+    if ((maxV - minV) > 0.05f) {
+        return false; 
+    }
+    
+    capturedVolt = sumVolt / N;
+    capturedTemp = sumTemp / N;
+    return true;
+}
 void StateMachine::_handleCalDI(ButtonEvent ev, const SensorData& sensor) {
     if (ev == ButtonEvent::LONG_PRESS) {
-        tmp_v_di = sensor.currentVolt;
-        _goTo(AppState::CAL_SALT);
+        // เมื่อกดค้าง ให้เริ่มเช็คความนิ่ง
+        if (_captureStableValue(tmp_v_di, tmp_t_di)) {
+            requestSound(SoundEvent::SUCCESS);
+            _goTo(AppState::CAL_SALT);
+        } else {
+            // ถ้าน้ำแกว่งไป ให้ร้องเตือน Error (ไม่ต้องเปลี่ยนหน้า)
+            requestSound(SoundEvent::BACK); 
+        }
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         _lastCalState = AppState::CAL_DI;
         cancelSelect  = 1;
@@ -186,14 +312,13 @@ void StateMachine::_handleCalDI(ButtonEvent ev, const SensorData& sensor) {
     }
 }
 
-// ==========================================
-// CAL_SALT
-// ==========================================
 void StateMachine::_handleCalSalt(ButtonEvent ev, const SensorData& sensor) {
     if (ev == ButtonEvent::LONG_PRESS) {
-        tmp_v_salt = sensor.currentVolt;
-        tmp_t_salt = sensor.currentTemp;
-        _goTo(AppState::CAL_FINISH);
+        if (_captureStableValue(tmp_v_salt, tmp_t_salt)) {
+            _goTo(AppState::CAL_FINISH);
+        } else {
+            requestSound(SoundEvent::BACK); 
+        }
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         _lastCalState = AppState::CAL_SALT;
         cancelSelect  = 1;
@@ -201,15 +326,26 @@ void StateMachine::_handleCalSalt(ButtonEvent ev, const SensorData& sensor) {
     }
 }
 
-// ==========================================
-// CAL_FINISH — บันทึกค่าจริง
-// ==========================================
 void StateMachine::_handleCalFinish() {
-    NVSManager::calib.v_di   = tmp_v_di;
-    NVSManager::calib.v_salt = tmp_v_salt;
-    NVSManager::calib.t_salt = tmp_t_salt;
-    NVSManager::saveCalib();
-    requestSound(SoundEvent::SUCCESS);
+    float newAlpha, newBeta;
+    
+    // คำนวณหา Alpha/Beta จากค่าน้ำ DI และ Salt ที่เพิ่งจดจำมา
+    if (SalinityCalc::computeAlphaBeta(tmp_v_di, tmp_t_di, tmp_v_salt, tmp_t_salt, newAlpha, newBeta)) {
+        
+        // ถ้าคำนวณสำเร็จ ให้เซฟทุกอย่างลง NVS (หรือ EEPROM ของคุณ)
+        NVSManager::calib.v_di   = tmp_v_di;
+        NVSManager::calib.v_salt = tmp_v_salt;
+        NVSManager::calib.t_salt = tmp_t_salt;
+        NVSManager::calib.alpha  = newAlpha; // เซฟ Alpha
+        NVSManager::calib.beta   = newBeta;  // เซฟ Beta
+        NVSManager::saveCalib();
+        
+        requestSound(SoundEvent::SUCCESS);
+    } else {
+        // ถ้าคำนวณพัง (เช่น จุ่มน้ำผิดขวด แรงดันเท่ากัน) ให้ร้องเตือน
+        requestSound(SoundEvent::BACK);
+    }
+    
     _goTo(AppState::MAIN_SCREEN);
 }
 
@@ -222,8 +358,8 @@ void StateMachine::_handleCalCancelConfirm(ButtonEvent ev) {
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         if (cancelSelect == 0) {
             // YES → ยกเลิก calibration กลับ main menu
-            menuIndex = 3;
-            _goTo(AppState::MAIN_MENU);
+            menuIndex = 0;
+            _goTo(AppState::CAL_MENU);
         } else {
             // NO → กลับไปทำ calibration ต่อ
             _goTo(_lastCalState);

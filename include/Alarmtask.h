@@ -14,8 +14,6 @@
 
 class AlarmTask {
 public:
-    // ต้องการ StateMachine เพื่อเช็คว่าอยู่หน้าไหน
-    // LED จะทำงานเฉพาะหน้า MAIN_SCREEN, READ_TEMP, READ_GPS
     AlarmTask(const StateMachine& sm);
 
     static void taskEntry(void* param);

@@ -15,6 +15,8 @@ const char* NVSManager::KEY_V_SALT  = "v_salt";
 const char* NVSManager::KEY_T_SALT  = "t_salt";
 const char* NVSManager::KEY_THRESH_G = "th_g";
 const char* NVSManager::KEY_THRESH_R = "th_r";
+const char* NVSManager::KEY_ALPHA    = "alpha";
+const char* NVSManager::KEY_BETA     = "beta";
 
 // ==========================================
 // Load — เรียกครั้งเดียวตอน boot
@@ -26,6 +28,8 @@ void NVSManager::load() {
     calib.v_di   = _prefs.getFloat(KEY_V_DI,    calib.v_di);
     calib.v_salt = _prefs.getFloat(KEY_V_SALT,   calib.v_salt);
     calib.t_salt = _prefs.getFloat(KEY_T_SALT,   calib.t_salt);
+    calib.alpha  = _prefs.getFloat(KEY_ALPHA,    calib.alpha); // เซฟ Alpha/Beta ด้วย
+    calib.beta   = _prefs.getFloat(KEY_BETA,     calib.beta);
 
     // โหลด Threshold
     thresh.green = _prefs.getFloat(KEY_THRESH_G, thresh.green);
@@ -42,6 +46,8 @@ void NVSManager::saveCalib() {
     _prefs.putFloat(KEY_V_DI,   calib.v_di);
     _prefs.putFloat(KEY_V_SALT, calib.v_salt);
     _prefs.putFloat(KEY_T_SALT, calib.t_salt);
+    _prefs.putFloat(KEY_ALPHA,  calib.alpha); // เซฟ Alpha/Beta ด้วย
+    _prefs.putFloat(KEY_BETA,   calib.beta);
     _prefs.end();
 }
 

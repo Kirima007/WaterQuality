@@ -38,6 +38,9 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::READ_GPS:             self->_drawReadGPS();           break;
             case AppState::THRESH_MENU:          self->_drawThreshMenu();        break;
             case AppState::EDIT_THRESH:          self->_drawEditThresh();        break;
+            case AppState::CAL_MENU:             self->_drawCalMenu();           break;
+            case AppState::CAL_MANUAL:           self->_drawCalmanual();         break;
+            case AppState::EDIT_CAL_MANUAL:      self->_drawEditCalManual();     break;
             case AppState::CAL_DI:               self->_drawCalDI();             break;
             case AppState::CAL_SALT:             self->_drawCalSalt();           break;
             case AppState::CAL_FINISH:           self->_drawCalFinish();         break;
@@ -90,7 +93,7 @@ void ScreenManager::_drawMainScreen() {
 
     _lcd.setCursor(0, 2);
     _lcd.print("Temp: ");
-    _printPadded(_sensor.currentTemp, 1, 5);
+    _printPadded(_sensor.currentTemp, 1, 4);
     _lcd.print(" C  ");
 
     _lcd.setCursor(0, 3);
@@ -207,6 +210,57 @@ void ScreenManager::_drawEditThresh() {
     _lcd.print("   Click to Save    ");
 }
 
+void ScreenManager::_drawCalMenu() { //new
+    const char* items[] = {
+        "Auto Calibrate",
+        "Manual Calibrate",
+        "Back"
+    };
+
+    for (int i = 0; i < 3; i++) {
+        _lcd.setCursor(0, i);
+        _lcd.print(_sm.menuIndex == i ? "> " : "  ");
+        _lcd.print(items[i]);
+    }
+}
+
+void ScreenManager::_drawCalmanual() {
+    int idx = _sm.menuIndex;
+    _lcd.setCursor(0, 0);
+    _lcd.print(idx == 0 ? "> " : "  ");
+    _lcd.print("Alpha : ");
+    _printPadded(NVSManager::calib.alpha, 3, 5);
+
+    _lcd.setCursor(0, 1);
+    _lcd.print(idx == 1 ? "> " : "  ");
+    _lcd.print("Beta  : ");
+    _printPadded(NVSManager::calib.beta, 3, 5);
+
+    _lcd.setCursor(0, 2);
+    _lcd.print(idx == 2 ? "> Back              " : "  Back              ");
+}
+
+void ScreenManager::_drawEditCalManual() {
+    _lcd.setCursor(0, 0);
+    _lcd.print("--- Adjust Value ---");
+
+    _lcd.setCursor(0, 1);
+    if (_sm.editingColor == 'A') {
+        _lcd.print("  Alpha (A) Multi.  ");
+    } else {
+        _lcd.print("   Beta (B) Offset  ");
+    }
+
+    _lcd.setCursor(0, 2);
+    float val = (_sm.editingColor == 'A') ? NVSManager::calib.alpha : NVSManager::calib.beta;
+    _lcd.print("      [");
+    _printPadded(val, 3, 6);
+    _lcd.print("]     ");
+
+    _lcd.setCursor(0, 3);
+    _lcd.print("  Click to Confirm  ");
+}
+
 void ScreenManager::_drawCalDI() {
     _lcd.setCursor(0, 0);
     _lcd.print("1. Insert DI Water  ");
@@ -277,7 +331,7 @@ void ScreenManager::_drawSimStatus() {
     if (!SimTask::isConnected()) {
         _lcd.print("SIM : No Network... ");
     } else if (sig == 99 || sig == 0) {
-        _lcd.print("SIM : No Signal  99 ");
+        _lcd.print("SIM : No Signal (99) ");
     } else {
         _lcd.print("SIM : OK (");
         _lcd.print(sig);

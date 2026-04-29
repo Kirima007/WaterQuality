@@ -7,7 +7,7 @@
 #include "StateMachine.h"
 #include "NVSManager.h"
 
-#define DISPLAY_TASK_DELAY_MS  50    // วาด LCD ทุก 50ms (20fps)
+#define DISPLAY_TASK_DELAY_MS  25    // วาด LCD ทุก 25ms (40fps)
 #define DISPLAY_TASK_STACK     8192
 #define DISPLAY_TASK_PRIORITY  1
 #define DISPLAY_TASK_CORE      1
@@ -40,6 +40,9 @@ private:
     void _drawReadGPS();
     void _drawThreshMenu();
     void _drawEditThresh();
+    void _drawCalMenu(); // new
+    void _drawCalmanual(); // new
+    void _drawEditCalManual(); // new
     void _drawCalDI();
     void _drawCalSalt();
     void _drawCalFinish(); 

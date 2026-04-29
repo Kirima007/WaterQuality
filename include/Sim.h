@@ -33,12 +33,13 @@ public:
     static bool isConnected();  // SIM/GPRS ต่ออยู่ไหม
     static int  getSignalQuality();
     static void requestSend(); // เรียกจาก StateMachine เมื่ออยากส่งข้อมูล
-    
+    static void requestSendCalib(); // เรียกจาก StateMachine เมื่ออยากส่งข้อมูลการปรับค่า
 
 
 private:
     static volatile bool _connected;
     static volatile bool _sendRequested;
+    static volatile bool _sendRequestedCalib;
     static volatile int  _csq;
 
     // สร้าง JSON payload
