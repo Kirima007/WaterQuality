@@ -3,7 +3,7 @@
 // ==========================================
 // Constants
 // ==========================================
-const float SalinityCalc::TARGET_PPT = 6.35f;
+// const float SalinityCalc::TARGET_PPT = 6.35f;
 
 float SalinityCalc::calcEC25(float volt, float tempC) {
     float ecBase = (19.47f * volt) - 0.008f;
@@ -16,8 +16,8 @@ bool SalinityCalc::computeAlphaBeta(float v_di, float t_di,
     float ec25_di   = calcEC25(v_di, t_di);
     float ec25_salt = calcEC25(v_salt, t_salt);
 
-    float target_ec_di   = 0.0f;  
-    float target_ec_salt = (TARGET_PPT - 0.1634f) / 0.4803f; 
+    float target_ec_di   = 1.413f;   // สำหรับตอนจุ่มน้ำยา 1413 us/cm
+    float target_ec_salt = 12.88f;   // สำหรับตอนจุ่มน้ำยา 12.88 ms/cm
 
     // ป้องกัน Error หารด้วยศูนย์
     if (abs(ec25_salt - ec25_di) < 0.0001f) return false;

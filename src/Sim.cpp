@@ -12,20 +12,20 @@
 // ==========================================
 volatile bool SimTask::_connected          = false;
 volatile bool SimTask::_sendRequested      = false;
-volatile bool SimTask::_sendCalibRequested = false;  // ← เพิ่ม
+volatile bool SimTask::_sendCalibRequested = false;
 volatile int  SimTask::_signalQuality      = 0;
 
 bool SimTask::isConnected()      { return _connected; }
 int  SimTask::getSignalQuality() { return _signalQuality; }
 void SimTask::requestSend()      { _sendRequested      = true; }
-void SimTask::requestSendCalib() { _sendCalibRequested = true; }  // ← เพิ่ม
+void SimTask::requestSendCalib() { _sendCalibRequested = true; }
 
 TinyGsm       modem(simSerial);
 TinyGsmClient gsmClient(modem);
 static SemaphoreHandle_t modemMutex = nullptr;
 
 // ==========================================
-// Helper: ส่ง HTTP POST (ใช้ร่วมกันทั้งสอง endpoint)
+// Helper: ส่ง HTTP POST
 // ==========================================
 static bool _doPost(const String& path, const String& payload, StateMachine* sm, bool isCalib) {
     int  httpCode = 0;
@@ -37,7 +37,7 @@ static bool _doPost(const String& path, const String& payload, StateMachine* sm,
 
         http.beginRequest();
         http.post(path);
-        http.sendHeader("Content-Type",  "application/json");
+        http.sendHeader("Content-Type",   "application/json");
         http.sendHeader("Accept",         "application/json");
         http.sendHeader("Connection",     "close");
         http.sendHeader("Content-Length", payload.length());
@@ -88,6 +88,7 @@ void SimTask::taskEntry(void* param) {
     // ==========================================
     SensorData sensor{};
     GPSData    gps{};
+    int failCount = 0; // ตัวนับสำหรับทำ Hard Reset
 
     for (;;) {
         bool networkOk = false;
@@ -105,8 +106,28 @@ void SimTask::taskEntry(void* param) {
             xSemaphoreGive(modemMutex);
         }
 
-        _connected     = (networkOk && gprsOk);
-        _signalQuality = _connected ? modem.getSignalQuality() : 0;
+        _connected = (networkOk && gprsOk);
+
+        // --- ระบบกู้ชีพ (Auto-Recovery) ---
+        if (!_connected) {
+            failCount++;
+            if (failCount > 10) { 
+                Serial.println("[SIM800L] Hang detected! Hard Resetting...");
+                digitalWrite(MODEM_RST, LOW);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                digitalWrite(MODEM_RST, HIGH);
+                vTaskDelay(pdMS_TO_TICKS(3000));
+                
+                if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
+                    modem.restart();
+                    xSemaphoreGive(modemMutex);
+                }
+                failCount = 0;
+            }
+        } else {
+            failCount = 0;
+            _signalQuality = modem.getSignalQuality();
+        }
 
         // รอบ 2: ส่ง Sensor Data
         if (_sendRequested) {
@@ -115,14 +136,26 @@ void SimTask::taskEntry(void* param) {
             if (!_connected) {
                 sm->onSimSendComplete(false, 0);
             } else {
-                xQueuePeek(sensorQueue, &sensor, 0);
-                xQueuePeek(gpsQueue,    &gps,    0);
-                String payload = _buildJson(sensor, gps);
-                _doPost(HTTP_PATH, payload, sm, false);
+                if (xQueuePeek(sensorQueue, &sensor, 0) == pdTRUE) {
+                    xQueuePeek(gpsQueue, &gps, 0); 
+                    
+                    // 🚨 กฎเหล็ก: ถ้า GPS ไม่ติด ยกเลิกการส่งทันที!
+                    if (!gps.valid) {
+                        Serial.println("[SIM800L] Abort sending: GPS no fix!");
+                        // แจ้ง StateMachine ว่าส่ง Fail (ใช้ -2 เพื่อบอกว่าเป็นเพราะ GPS ไม่ติด)
+                        sm->onSimSendComplete(false, -2); 
+                    } else {
+                        // ถ้า GPS ติด ค่อยแพ็ก JSON แล้วส่ง
+                        String payload = _buildJson(sensor, gps);
+                        _doPost(HTTP_PATH, payload, sm, false);
+                    }
+                } else {
+                    sm->onSimSendComplete(false, -1); // คิวว่าง Fail
+                }
             }
         }
 
-        // รอบ 3: ส่ง Calibration Data ← ใหม่
+        // รอบ 3: ส่ง Calibration Data (ปกติ Calib ไม่จำเป็นต้องบังคับมี GPS ก็ได้)
         if (_sendCalibRequested) {
             _sendCalibRequested = false;
 
@@ -147,14 +180,10 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     doc["salinity"] = serialized(String(sensor.currentPPT,  2));
     doc["temp"]     = serialized(String(sensor.currentTemp, 1));
 
+    // เนื่องจากเรากรอง gps.valid ไปแล้วก่อนส่ง ตรงนี้จะมีค่าเสมอ
     JsonObject address = doc["address"].to<JsonObject>();
-    if (gps.valid) {
-        address["x"] = String(gps.lat, 6);
-        address["y"] = String(gps.lng, 6);
-    } else {
-        address["x"] = nullptr;
-        address["y"] = nullptr;
-    }
+    address["x"] = String(gps.lat, 6);
+    address["y"] = String(gps.lng, 6);
 
     String payload;
     serializeJson(doc, payload);
@@ -162,24 +191,11 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
 }
 
 // ==========================================
-// JSON: Calibration Data ← ใหม่
-// {
-//   "id": 1,
-//   "alpha": 1.023,
-//   "beta": -0.015,
-//   "v_di": 0.0004,
-//   "v_salt": 0.4746,
-//   "t_salt": 23.5
-// }
+// JSON: Calibration Data
 // ==========================================
 String SimTask::_buildCalibJson() {
     JsonDocument doc;
     doc["id"]     = DEVICE_ID;
-    doc["alpha"]  = serialized(String(NVSManager::calib.alpha,  4));
-    doc["beta"]   = serialized(String(NVSManager::calib.beta,   4));
-    doc["v_di"]   = serialized(String(NVSManager::calib.v_di,   4));
-    doc["v_salt"] = serialized(String(NVSManager::calib.v_salt, 4));
-    doc["t_salt"] = serialized(String(NVSManager::calib.t_salt, 2));
 
     String payload;
     serializeJson(doc, payload);

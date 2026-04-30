@@ -236,7 +236,6 @@ void StateMachine::_handleCalManual(ButtonEvent ev, const SensorData& sensor) {
         requestSound(SoundEvent::SCROLL);
         menuIndex = (menuIndex + 1) % 3; // 0=A, 1=B, 2=Save, 3=Back
     } else if (ev == ButtonEvent::ROTATE_CCW) {
-        requestSound(SoundEvent::SELECT);
         requestSound(SoundEvent::SCROLL);
         menuIndex = (menuIndex - 1 + 3) % 3;
     } else if (ev == ButtonEvent::SHORT_PRESS) {
@@ -342,6 +341,7 @@ void StateMachine::_handleCalDI(ButtonEvent ev, const SensorData& sensor) {
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         _lastCalState = AppState::CAL_DI;
         cancelSelect  = 1;
+        requestSound(SoundEvent::SCROLL);
         _goTo(AppState::CAL_CANCEL_CONFIRM);
     }
 }
@@ -357,6 +357,7 @@ void StateMachine::_handleCalSalt(ButtonEvent ev, const SensorData& sensor) {
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         _lastCalState = AppState::CAL_SALT;
         cancelSelect  = 1;
+        requestSound(SoundEvent::SCROLL);
         _goTo(AppState::CAL_CANCEL_CONFIRM);
     }
 }

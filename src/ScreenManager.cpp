@@ -243,7 +243,7 @@ void ScreenManager::_drawSystemInfo() {
     _lcd.print(buf2);
 
     _lcd.setCursor(0, 3);
-    _lcd.print("by AIOT LAB         ");
+    _lcd.print("by MARID (AIOT LAB) ");
 }
 
 
@@ -286,32 +286,32 @@ void ScreenManager::_drawEditCalManual() {
 
 void ScreenManager::_drawCalDI() {
     _lcd.setCursor(0, 0);
-    _lcd.print("1. Insert DI Water  ");
+    _lcd.print("1. Insert Water     ");
     _lcd.setCursor(0, 1);
+    _lcd.print("Target: 1.413 us/cm");
+    _lcd.setCursor(0, 2);
     _lcd.print("V:");
     _lcd.print(_sensor.currentVolt, 4);
     _lcd.print(" T:");
     _lcd.print(_sensor.currentTemp, 1);
-    _lcd.print("C ");
-    _lcd.setCursor(0, 2);
-    _lcd.print("Click  to Cancel    ");
+    _lcd.print("C   ");
     _lcd.setCursor(0, 3);
-    _lcd.print(">> Hold to Record   ");
+    _lcd.print("Click  to Cancel    ");
 }
 
 void ScreenManager::_drawCalSalt() {
     _lcd.setCursor(0, 0);
-    _lcd.print("2. Insert 35ppt Sol.");
+    _lcd.print("2. Insert Water     ");
     _lcd.setCursor(0, 1);
+    _lcd.print("Target: 12.88 ms/cm");
+    _lcd.setCursor(0, 2);
     _lcd.print("V:");
     _lcd.print(_sensor.currentVolt, 4);
     _lcd.print(" T:");
     _lcd.print(_sensor.currentTemp, 1);
-    _lcd.print("C ");
-    _lcd.setCursor(0, 2);
-    _lcd.print("Click  to Cancel    ");
+    _lcd.print("C   ");
     _lcd.setCursor(0, 3);
-    _lcd.print(">> Hold to Record   ");
+    _lcd.print("Click  to Cancel    ");
 }
 
 void ScreenManager::_drawCalFinish() {
