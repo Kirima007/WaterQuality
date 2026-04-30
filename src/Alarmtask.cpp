@@ -70,11 +70,11 @@ void AlarmTask::taskEntry(void* param) {
             // อันตราย → แดง + buzzer
             self->_setRGB(true, false, false);
 
-            // // Buzzer เตือนเป็นจังหวะ (3 ครั้งต่อรอบ)
-            // alarmStep = (alarmStep + 1) % 8;
-            // if (alarmStep == 0 || alarmStep == 2 || alarmStep == 4) {
-            //     tone(BUZZER, 3500, 100);
-            // }
+            // Buzzer เตือนเป็นจังหวะ (3 ครั้งต่อรอบ)
+            alarmStep = (alarmStep + 1) % 8;
+            if (alarmStep == 0 || alarmStep == 2 || alarmStep == 4) {
+                tone(BUZZER, 3500, 100);
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(ALARM_TASK_DELAY_MS));

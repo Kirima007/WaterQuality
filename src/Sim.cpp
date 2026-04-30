@@ -1,4 +1,5 @@
 #define TINY_GSM_MODEM_SIM800
+#define simSerial Serial1
 
 #include "Sim.h"
 #include "StateMachine.h"
@@ -9,40 +10,46 @@
 // ==========================================
 // Static Members
 // ==========================================
-volatile bool SimTask::_connected    = false;
+volatile bool SimTask::_connected     = false;
 volatile bool SimTask::_sendRequested = false;
-volatile int  SimTask::_csq = 0;
+volatile int  SimTask::_signalQuality = 0;
 
-bool SimTask::isConnected()  { return _connected; }
-void SimTask::requestSend()  { _sendRequested = true; }
-int  SimTask::getSignalQuality() { return _csq; }
+bool SimTask::isConnected()      { return _connected; }
+int  SimTask::getSignalQuality() { return _signalQuality; }
+void SimTask::requestSend()      { _sendRequested = true; }
+
+// modem อยู่ global ไม่กิน Stack ของ Task
+TinyGsm       modem(simSerial);
+TinyGsmClient gsmClient(modem);
+
+// Mutex ป้องกัน modem ถูกใช้พร้อมกัน (copy จาก reference)
+static SemaphoreHandle_t modemMutex = nullptr;
 
 // ==========================================
 // FreeRTOS Task Entry Point
 // ==========================================
 void SimTask::taskEntry(void* param) {
     disableCore0WDT();
+
     StateMachine* sm = static_cast<StateMachine*>(param);
 
+    // สร้าง Mutex
+    modemMutex = xSemaphoreCreateMutex();
+
     // --- เปิด SIM800L ---
+    pinMode(MODEM_PWRKEY,   OUTPUT);
+    pinMode(MODEM_RST,      OUTPUT);
     pinMode(MODEM_POWER_ON, OUTPUT);
+    digitalWrite(MODEM_PWRKEY,   LOW);
+    digitalWrite(MODEM_RST,      HIGH);
     digitalWrite(MODEM_POWER_ON, HIGH);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    HardwareSerial simSerial(1);
-    simSerial.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
+    simSerial.begin(9600, SERIAL_8N1, MODEM_RX, MODEM_TX);
     vTaskDelay(pdMS_TO_TICKS(3000));
 
-    TinyGsm modem(simSerial);
     modem.restart();
     vTaskDelay(pdMS_TO_TICKS(2000));
-
-    // --- รอจับสัญญาณ ---
-    modem.waitForNetwork(60000L);
-
-    // --- เชื่อมต่อ GPRS ---
-    modem.gprsConnect(SIM_APN, "", "");
-    _connected = modem.isGprsConnected();
 
     // ==========================================
     // Main Loop
@@ -51,31 +58,54 @@ void SimTask::taskEntry(void* param) {
     GPSData    gps{};
 
     for (;;) {
-        // อัปเดตสถานะ GPRS ทุก loop
-        _connected = modem.isGprsConnected();
-        if (!_connected) {
-            modem.gprsConnect(SIM_APN, "", "");
-            _connected = modem.isGprsConnected();
+        bool networkOk = false;
+        bool gprsOk    = false;
+
+        // --- รอบ 1: เช็คและต่อ Network + GPRS ผ่าน Mutex ---
+        if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
+
+            networkOk = modem.isNetworkConnected();
+            if (!networkOk) {
+                networkOk = modem.waitForNetwork(60000L);
+            }
+
+            if (networkOk) {
+                gprsOk = modem.isGprsConnected();
+                if (!gprsOk) {
+                    gprsOk = modem.gprsConnect(SIM_APN, "", "");
+                }
+            }
+
+            xSemaphoreGive(modemMutex);
         }
 
-        // รอ requestSend จาก StateMachine
+        _connected     = (networkOk && gprsOk);
+        _signalQuality = _connected ? modem.getSignalQuality() : 0;
+
+        // --- รอบ 2: เช็ค sendRequested ---
         if (_sendRequested) {
             _sendRequested = false;
+
+            // ถ้าไม่มีเน็ต → แจ้งทันที ไม่ต้องรอ HTTP timeout
+            if (!_connected) {
+                sm->onSimSendComplete(false, 0);
+                vTaskDelay(pdMS_TO_TICKS(200));
+                continue;
+            }
 
             // ดึงข้อมูลล่าสุด
             xQueuePeek(sensorQueue, &sensor, 0);
             xQueuePeek(gpsQueue,    &gps,    0);
 
             String payload  = _buildJson(sensor, gps);
-            String response = "";
             int    httpCode = 0;
             bool   success  = false;
 
-            if (_connected) {
-                // สร้าง client ใหม่ทุกครั้ง
-                TinyGsmClient gsmClient(modem);
-                HttpClient    http(gsmClient, HTTP_HOST, HTTP_PORT);
-                http.setTimeout(5000);
+            // ส่ง HTTP ผ่าน Mutex (รอบ 2 แยกจากรอบ Network)
+            if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
+
+                HttpClient http(gsmClient, HTTP_HOST, HTTP_PORT);
+                http.setTimeout(2000);  // ← 2 วิ เหมือน reference
 
                 http.beginRequest();
                 http.post(HTTP_PATH);
@@ -88,22 +118,19 @@ void SimTask::taskEntry(void* param) {
                 http.endRequest();
 
                 httpCode = http.responseStatusCode();
-                response = http.responseBody();
+                http.responseBody(); // flush
                 success  = (httpCode >= 200 && httpCode < 300);
 
                 http.stop();
                 gsmClient.stop();
-            } else {
-                // ไม่ได้ต่อ internet → แจ้ง fail ทันที
-                httpCode = 0;
-                success  = false;
+
+                xSemaphoreGive(modemMutex);
             }
 
-            // แจ้ง StateMachine ว่าส่งเสร็จแล้ว
             sm->onSimSendComplete(success, httpCode);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(200)); // เหมือน reference
     }
 }
 
@@ -119,14 +146,11 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
 
     JsonObject address = doc["address"].to<JsonObject>();
     if (gps.valid) {
-        // address["x"] = String(gps.lat, 6);
-        // address["y"] = String(gps.lng, 6);
-        address["x"] = 13.726847;
-        address["y"] = 100.772621;
-
+        address["x"] = String(gps.lat, 6);
+        address["y"] = String(gps.lng, 6);
     } else {
-        address["x"] = 13.726847;
-        address["y"] = 100.772621;
+        address["x"] = nullptr;
+        address["y"] = nullptr;
     }
 
     String payload;

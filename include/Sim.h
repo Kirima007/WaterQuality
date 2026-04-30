@@ -40,7 +40,7 @@ private:
     static volatile bool _connected;
     static volatile bool _sendRequested;
     static volatile bool _sendRequestedCalib;
-    static volatile int  _csq;
+    static volatile int  _signalQuality;
 
     // สร้าง JSON payload
     static String _buildJson(const SensorData& sensor, const GPSData& gps);
