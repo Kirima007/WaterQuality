@@ -13,3 +13,11 @@
 #define GPS_TX 25
 
 #define STARTUP_DELAY_MS 1500   // หน้า startup แสดงกี่ ms
+
+#define SIM_APN         "internet"        // APN ของซิม (DTAC=internet, True=true, AIS=ais)
+#define HTTP_HOST       "161.246.157.210" // โฮสต์ปลายทาง
+#define HTTP_PORT       80                // พอร์ต
+#define HTTP_PATH       "/api/data"     // endpoint
+#define HTTP_PATH_CALIB "/api/calibrate/salinity"
+#define DEVICE_ID       99                 // ID ของเครื่องนี้
+#define SIM_PUBLISH_MS  30000             // ส่งทุก 30 วิ

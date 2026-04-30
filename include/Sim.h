@@ -4,17 +4,12 @@
 #include <freertos/task.h>
 #include "shared.h"
 #include "NVSManager.h"
+#include "Config.h"
 
 // ==========================================
 // ตั้งค่า Server
 // ==========================================
-#define SIM_APN         "internet"        // APN ของซิม (DTAC=internet, True=true, AIS=ais)
-#define HTTP_HOST       "161.246.157.210" // โฮสต์ปลายทาง
-#define HTTP_PORT       80                // พอร์ต
-#define HTTP_PATH       "/api/data"     // endpoint
-#define HTTP_PATH_CALIB "/api/calibrate/salinity"
-#define DEVICE_ID       1                 // ID ของเครื่องนี้
-#define SIM_PUBLISH_MS  30000             // ส่งทุก 30 วิ
+
 
 // SIM800L Pins (T-Call V1.4 built-in)
 #define MODEM_RX        26

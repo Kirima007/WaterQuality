@@ -53,6 +53,7 @@ void StateMachine::handleEvent(ButtonEvent ev) {
         case AppState::THRESH_MENU:         _handleThreshMenu(ev);              break;
         case AppState::EDIT_THRESH:         _handleEditThresh(ev);              break;
         case AppState::CAL_MENU:            _handleCalMenu(ev);                 break;
+        case AppState::SYSTEM_INFO:         _handleSystemInfo(ev);              break;
         case AppState::CAL_MANUAL:          _handleCalManual(ev, sensor);       break;
         case AppState::EDIT_CAL_MANUAL:     _handleEditCalManual(ev);           break;
         case AppState::CAL_DI:              _handleCalDI(ev, sensor);           break;
@@ -86,10 +87,10 @@ void StateMachine::_handleMainScreen(ButtonEvent ev) {
 // ==========================================
 void StateMachine::_handleMainMenu(ButtonEvent ev) {
     if (ev == ButtonEvent::ROTATE_CW) {
-        menuIndex = (menuIndex + 1) % 5;
+        menuIndex = (menuIndex + 1) % 6;
         requestSound(SoundEvent::SCROLL);
     } else if (ev == ButtonEvent::ROTATE_CCW) {
-        menuIndex = (menuIndex - 1 + 5) % 5;
+        menuIndex = (menuIndex - 1 + 6) % 6;
         requestSound(SoundEvent::SCROLL);
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         switch (menuIndex) {
@@ -103,7 +104,8 @@ void StateMachine::_handleMainMenu(ButtonEvent ev) {
             case 3: 
                 menuIndex = 0;
                 _goTo(AppState::CAL_MENU);  requestSound(SoundEvent::SELECT);    break;
-            case 4: _goTo(AppState::MAIN_SCREEN);  requestSound(SoundEvent::BACK); break;
+            case 4: _goTo(AppState::SYSTEM_INFO);  requestSound(SoundEvent::SELECT); break;
+            case 5: _goTo(AppState::MAIN_SCREEN);  requestSound(SoundEvent::BACK); break;
         }
     }
 }
@@ -217,6 +219,14 @@ void StateMachine::_handleCalMenu(ButtonEvent ev) {
                 _goTo(AppState::MAIN_MENU);
                 break;
         }
+    }
+}
+
+
+void StateMachine::_handleSystemInfo(ButtonEvent ev) {
+    if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
+        requestSound(SoundEvent::BACK);
+        _goTo(AppState::MAIN_MENU);
     }
 }
 
@@ -408,6 +418,7 @@ void StateMachine::_handleSimStatus(ButtonEvent ev) {
     }
     else if (ev == ButtonEvent::LONG_PRESS) {
         SimTask::requestSend();
+        requestSound(SoundEvent::SELECT);
         _goTo(AppState::SIM_SENDING);
     }
 }

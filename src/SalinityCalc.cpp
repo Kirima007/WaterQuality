@@ -3,7 +3,7 @@
 // ==========================================
 // Constants
 // ==========================================
-const float SalinityCalc::TARGET_PPT = 35.0f;
+const float SalinityCalc::TARGET_PPT = 6.35f;
 
 float SalinityCalc::calcEC25(float volt, float tempC) {
     float ecBase = (19.47f * volt) - 0.008f;

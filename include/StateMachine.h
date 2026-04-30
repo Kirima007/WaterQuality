@@ -14,6 +14,7 @@ enum class AppState {
     THRESH_MENU,
     EDIT_THRESH,
     CAL_MENU, // new
+    SYSTEM_INFO,
     CAL_MANUAL, // new
     EDIT_CAL_MANUAL, // new
     CAL_DI,
@@ -73,6 +74,7 @@ private:
     void _handleThreshMenu(ButtonEvent ev);
     void _handleEditThresh(ButtonEvent ev);
     void _handleCalMenu(ButtonEvent ev); // new
+    void _handleSystemInfo(ButtonEvent ev);
     void _handleCalManual(ButtonEvent ev, const SensorData& sensor);
     void _handleEditCalManual(ButtonEvent ev);
     void _handleCalDI(ButtonEvent ev, const SensorData& sensor);

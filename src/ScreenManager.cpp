@@ -39,6 +39,7 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::THRESH_MENU:          self->_drawThreshMenu();        break;
             case AppState::EDIT_THRESH:          self->_drawEditThresh();        break;
             case AppState::CAL_MENU:             self->_drawCalMenu();           break;
+            case AppState::SYSTEM_INFO:          self->_drawSystemInfo();        break;
             case AppState::CAL_MANUAL:           self->_drawCalmanual();         break;
             case AppState::EDIT_CAL_MANUAL:      self->_drawEditCalManual();     break;
             case AppState::CAL_DI:               self->_drawCalDI();             break;
@@ -113,10 +114,11 @@ void ScreenManager::_drawMainMenu() {
         "Read GPS          ",
         "LED Threshold     ",
         "Calibrate Mode    ",
+        "System Info       ",
         "Back              "
     };
 
-    int startIdx = max(0, min(_sm.menuIndex - 3, 1));
+    int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, 2);
     for (int i = 0; i < 4; i++) {
         _lcd.setCursor(0, i);
         int idx = startIdx + i;
@@ -223,6 +225,25 @@ void ScreenManager::_drawCalMenu() {
         _lcd.print(_sm.menuIndex == i ? "> " : "  ");
         _lcd.print(items[i]);
     }
+}
+
+
+void ScreenManager::_drawSystemInfo() {
+    _lcd.setCursor(0, 0);
+    _lcd.print("--- System Info ----");
+
+    _lcd.setCursor(0, 1);
+    char buf1[21];
+    sprintf(buf1, "Device ID: %-9d", DEVICE_ID);
+    _lcd.print(buf1);
+
+    _lcd.setCursor(0, 2);
+    char buf2[21];
+    sprintf(buf2, "Sensor CH: %-9s", "CH0");
+    _lcd.print(buf2);
+
+    _lcd.setCursor(0, 3);
+    _lcd.print("by AIOT LAB         ");
 }
 
 
@@ -372,15 +393,15 @@ void ScreenManager::_drawSimResult() {
     if (_sm.simLastSuccess) {
         _lcd.setCursor(0, 1); _lcd.print(" Send Success!  OK  ");
         _lcd.setCursor(0, 2);
-        _lcd.print(" HTTP: ");
-        _lcd.print(_sm.simLastHttpCode);
-        _lcd.print("              ");
+        char buf[21];
+        sprintf(buf, " HTTP: %-12d", _sm.simLastHttpCode);
+        _lcd.print(buf);
     } else {
         _lcd.setCursor(0, 1); _lcd.print(" Send Failed!  X    ");
         _lcd.setCursor(0, 2);
-        _lcd.print(" HTTP: ");
-        _lcd.print(_sm.simLastHttpCode);
-        _lcd.print("              ");
+        char buf[21];
+        sprintf(buf, " HTTP: %-12d", _sm.simLastHttpCode);
+        _lcd.print(buf);
     }
     _lcd.setCursor(0, 3); _lcd.print(" Click to go back   ");
 }
