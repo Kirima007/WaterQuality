@@ -10,30 +10,62 @@
 // ==========================================
 // Static Members
 // ==========================================
-volatile bool SimTask::_connected     = false;
-volatile bool SimTask::_sendRequested = false;
-volatile int  SimTask::_signalQuality = 0;
+volatile bool SimTask::_connected          = false;
+volatile bool SimTask::_sendRequested      = false;
+volatile bool SimTask::_sendCalibRequested = false;  // ← เพิ่ม
+volatile int  SimTask::_signalQuality      = 0;
 
 bool SimTask::isConnected()      { return _connected; }
 int  SimTask::getSignalQuality() { return _signalQuality; }
-void SimTask::requestSend()      { _sendRequested = true; }
+void SimTask::requestSend()      { _sendRequested      = true; }
+void SimTask::requestSendCalib() { _sendCalibRequested = true; }  // ← เพิ่ม
 
-// modem อยู่ global ไม่กิน Stack ของ Task
 TinyGsm       modem(simSerial);
 TinyGsmClient gsmClient(modem);
-
-// Mutex ป้องกัน modem ถูกใช้พร้อมกัน (copy จาก reference)
 static SemaphoreHandle_t modemMutex = nullptr;
+
+// ==========================================
+// Helper: ส่ง HTTP POST (ใช้ร่วมกันทั้งสอง endpoint)
+// ==========================================
+static bool _doPost(const String& path, const String& payload, StateMachine* sm, bool isCalib) {
+    int  httpCode = 0;
+    bool success  = false;
+
+    if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
+        HttpClient http(gsmClient, HTTP_HOST, HTTP_PORT);
+        http.setTimeout(2000);
+
+        http.beginRequest();
+        http.post(path);
+        http.sendHeader("Content-Type",  "application/json");
+        http.sendHeader("Accept",         "application/json");
+        http.sendHeader("Connection",     "close");
+        http.sendHeader("Content-Length", payload.length());
+        http.beginBody();
+        http.print(payload);
+        http.endRequest();
+
+        httpCode = http.responseStatusCode();
+        http.responseBody(); // flush
+        success  = (httpCode >= 200 && httpCode < 300);
+
+        http.stop();
+        gsmClient.stop();
+
+        xSemaphoreGive(modemMutex);
+    }
+
+    // แจ้ง StateMachine เสมอ ไม่ว่าจะ sensor หรือ calib
+    sm->onSimSendComplete(success, httpCode);
+    return success;
+}
 
 // ==========================================
 // FreeRTOS Task Entry Point
 // ==========================================
 void SimTask::taskEntry(void* param) {
     disableCore0WDT();
-
     StateMachine* sm = static_cast<StateMachine*>(param);
-
-    // สร้าง Mutex
     modemMutex = xSemaphoreCreateMutex();
 
     // --- เปิด SIM800L ---
@@ -61,85 +93,56 @@ void SimTask::taskEntry(void* param) {
         bool networkOk = false;
         bool gprsOk    = false;
 
-        // --- รอบ 1: เช็คและต่อ Network + GPRS ผ่าน Mutex ---
+        // รอบ 1: เช็ค / ต่อ Network + GPRS
         if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
-
             networkOk = modem.isNetworkConnected();
-            if (!networkOk) {
-                networkOk = modem.waitForNetwork(60000L);
-            }
+            if (!networkOk) networkOk = modem.waitForNetwork(60000L);
 
             if (networkOk) {
                 gprsOk = modem.isGprsConnected();
-                if (!gprsOk) {
-                    gprsOk = modem.gprsConnect(SIM_APN, "", "");
-                }
+                if (!gprsOk) gprsOk = modem.gprsConnect(SIM_APN, "", "");
             }
-
             xSemaphoreGive(modemMutex);
         }
 
         _connected     = (networkOk && gprsOk);
         _signalQuality = _connected ? modem.getSignalQuality() : 0;
 
-        // --- รอบ 2: เช็ค sendRequested ---
+        // รอบ 2: ส่ง Sensor Data
         if (_sendRequested) {
             _sendRequested = false;
 
-            // ถ้าไม่มีเน็ต → แจ้งทันที ไม่ต้องรอ HTTP timeout
             if (!_connected) {
                 sm->onSimSendComplete(false, 0);
-                vTaskDelay(pdMS_TO_TICKS(200));
-                continue;
+            } else {
+                xQueuePeek(sensorQueue, &sensor, 0);
+                xQueuePeek(gpsQueue,    &gps,    0);
+                String payload = _buildJson(sensor, gps);
+                _doPost(HTTP_PATH, payload, sm, false);
             }
-
-            // ดึงข้อมูลล่าสุด
-            xQueuePeek(sensorQueue, &sensor, 0);
-            xQueuePeek(gpsQueue,    &gps,    0);
-
-            String payload  = _buildJson(sensor, gps);
-            int    httpCode = 0;
-            bool   success  = false;
-
-            // ส่ง HTTP ผ่าน Mutex (รอบ 2 แยกจากรอบ Network)
-            if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
-
-                HttpClient http(gsmClient, HTTP_HOST, HTTP_PORT);
-                http.setTimeout(2000);  // ← 2 วิ เหมือน reference
-
-                http.beginRequest();
-                http.post(HTTP_PATH);
-                http.sendHeader("Content-Type",   "application/json");
-                http.sendHeader("Accept",          "application/json");
-                http.sendHeader("Connection",      "close");
-                http.sendHeader("Content-Length",  payload.length());
-                http.beginBody();
-                http.print(payload);
-                http.endRequest();
-
-                httpCode = http.responseStatusCode();
-                http.responseBody(); // flush
-                success  = (httpCode >= 200 && httpCode < 300);
-
-                http.stop();
-                gsmClient.stop();
-
-                xSemaphoreGive(modemMutex);
-            }
-
-            sm->onSimSendComplete(success, httpCode);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(200)); // เหมือน reference
+        // รอบ 3: ส่ง Calibration Data ← ใหม่
+        if (_sendCalibRequested) {
+            _sendCalibRequested = false;
+
+            if (!_connected) {
+                sm->onSimSendComplete(false, 0);
+            } else {
+                String payload = _buildCalibJson();
+                _doPost(HTTP_PATH_CALIB, payload, sm, true);
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
 // ==========================================
-// สร้าง JSON Payload
+// JSON: Sensor Data
 // ==========================================
 String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonDocument doc;
-
     doc["id"]       = DEVICE_ID;
     doc["salinity"] = serialized(String(sensor.currentPPT,  2));
     doc["temp"]     = serialized(String(sensor.currentTemp, 1));
@@ -152,6 +155,31 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
         address["x"] = nullptr;
         address["y"] = nullptr;
     }
+
+    String payload;
+    serializeJson(doc, payload);
+    return payload;
+}
+
+// ==========================================
+// JSON: Calibration Data ← ใหม่
+// {
+//   "id": 1,
+//   "alpha": 1.023,
+//   "beta": -0.015,
+//   "v_di": 0.0004,
+//   "v_salt": 0.4746,
+//   "t_salt": 23.5
+// }
+// ==========================================
+String SimTask::_buildCalibJson() {
+    JsonDocument doc;
+    doc["id"]     = DEVICE_ID;
+    doc["alpha"]  = serialized(String(NVSManager::calib.alpha,  4));
+    doc["beta"]   = serialized(String(NVSManager::calib.beta,   4));
+    doc["v_di"]   = serialized(String(NVSManager::calib.v_di,   4));
+    doc["v_salt"] = serialized(String(NVSManager::calib.v_salt, 4));
+    doc["t_salt"] = serialized(String(NVSManager::calib.t_salt, 2));
 
     String payload;
     serializeJson(doc, payload);

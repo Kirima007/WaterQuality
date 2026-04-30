@@ -29,6 +29,7 @@ void AlarmTask::taskEntry(void* param) {
     pinMode(RGB_R, OUTPUT);
     pinMode(RGB_G, OUTPUT);
     pinMode(RGB_B, OUTPUT);
+    pinMode(BUZZER, OUTPUT);
     self->_allOff();
 
     SensorData sensor{};

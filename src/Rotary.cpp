@@ -86,7 +86,6 @@ void RotaryInput::_handleButton() {
 
             ButtonEvent ev = ButtonEvent::LONG_PRESS;
             xQueueSend(inputQueue, &ev, 0);
-            requestSound(SoundEvent::SELECT);
         }
     }
 
@@ -100,7 +99,6 @@ void RotaryInput::_handleButton() {
         if (!_longPressTriggered && pressDuration > ROTARY_DEBOUNCE_MS) {
             ButtonEvent ev = ButtonEvent::SHORT_PRESS;
             xQueueSend(inputQueue, &ev, 0);
-            requestSound(SoundEvent::SELECT);
         }
     }
 }

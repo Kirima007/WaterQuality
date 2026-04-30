@@ -88,12 +88,12 @@ void ScreenManager::_drawMainScreen() {
 
     _lcd.setCursor(0, 1);
     _lcd.print("Sal : ");
-    _printPadded(_sensor.currentPPT, 2, 7);
+    _printPadded(_sensor.currentPPT, 2, 5);
     _lcd.print(" ppt");
 
     _lcd.setCursor(0, 2);
     _lcd.print("Temp: ");
-    _printPadded(_sensor.currentTemp, 1, 4);
+    _printPadded(_sensor.currentTemp, 1, 5);
     _lcd.print(" C  ");
 
     _lcd.setCursor(0, 3);
@@ -210,19 +210,21 @@ void ScreenManager::_drawEditThresh() {
     _lcd.print("   Click to Save    ");
 }
 
-void ScreenManager::_drawCalMenu() { //new
+void ScreenManager::_drawCalMenu() {
     const char* items[] = {
-        "Auto Calibrate",
-        "Manual Calibrate",
-        "Back"
+        "Auto Calibrate  ",  // 0
+        "Manual Calibrate",  // 1
+        "Send Calib Time ",  // 2
+        "Back            "   // 3
     };
-
-    for (int i = 0; i < 3; i++) {
+ 
+    for (int i = 0; i < 4; i++) {
         _lcd.setCursor(0, i);
         _lcd.print(_sm.menuIndex == i ? "> " : "  ");
         _lcd.print(items[i]);
     }
 }
+
 
 void ScreenManager::_drawCalmanual() {
     int idx = _sm.menuIndex;
@@ -237,7 +239,7 @@ void ScreenManager::_drawCalmanual() {
     _printPadded(NVSManager::calib.beta, 3, 5);
 
     _lcd.setCursor(0, 2);
-    _lcd.print(idx == 2 ? "> Back              " : "  Back              ");
+    _lcd.print(idx == 2 ? "> Save And SendTime" : "  Save And SendTime");
 }
 
 void ScreenManager::_drawEditCalManual() {
