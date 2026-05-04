@@ -53,29 +53,43 @@ void AlarmTask::taskEntry(void* param) {
         }
 
         // ดึงค่าล่าสุด
-        xQueuePeek(sensorQueue, &sensor, 0);
+        if (xQueuePeek(sensorQueue, &sensor, 0) == pdTRUE) {
+            
+            float ppt   = sensor.currentPPT;
+            float thG   = NVSManager::thresh.green;
+            float thY   = NVSManager::thresh.yellow;
+            float thR   = NVSManager::thresh.red;
 
-        float ppt   = sensor.currentPPT;
-        float thG   = NVSManager::thresh.green;
-        float thR   = NVSManager::thresh.red;
+            // 2. ปรับลอจิกการเตือนให้ครบทุกช่วง
+            if (ppt <= thG) {
+                // โซนปลอดภัย → เขียว
+                self->_setRGB(0, 1, 0);
 
-        if (ppt < thG) {
-            // ปกติ → เขียว
-            self->_setRGB(false, true, false);
+            } else if (ppt <= thY) {
+                // โซนเฝ้าระวัง → เหลือง + เตือนห่างๆ
+                self->_setRGB(1, 1, 0);
+                alarmStep = (alarmStep + 1) % 8;
+                if (alarmStep == 0) {
+                    tone(BUZZER, 3500, 100);
+                }
 
-        } else if (ppt < thR) {
-            // เตือน → น้ำเงิน
-            self->_setRGB(false, false, true);
+            } else if (ppt <= thR) {
+                // โซนอันตรายระดับ 1 → แดง + เตือนถี่
+                self->_setRGB(1, 0, 0);
+                alarmStep = (alarmStep + 1) % 8;
+                if (alarmStep == 0 || alarmStep == 2 || alarmStep == 4) {
+                    tone(BUZZER, 3500, 100);
+                }
 
-        } else {
-            // อันตราย → แดง + buzzer
-            self->_setRGB(true, false, false);
-
-            // Buzzer เตือนเป็นจังหวะ (3 ครั้งต่อรอบ)
-            alarmStep = (alarmStep + 1) % 8;
-            if (alarmStep == 0 || alarmStep == 2 || alarmStep == 4) {
-                tone(BUZZER, 3500, 100);
+            } else {
+                alarmStep = (alarmStep + 1) % 8;
+                self->_setRGB(alarmStep % 2, 0, 0); // ไฟแดงกระพริบ
+                tone(BUZZER, 3500, 200);            // เสียงเตือนยาวขึ้น
             }
+
+        }
+        else {
+            self->_allOff();
         }
 
         vTaskDelay(pdMS_TO_TICKS(ALARM_TASK_DELAY_MS));

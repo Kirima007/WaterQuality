@@ -10,6 +10,7 @@
 - จอ LCD 20x4 แสดงผลข้อมูลและเมนู
 - เมนูควบคุมด้วย rotary encoder พร้อมปุ่มกด
 - เชื่อมต่อ GPRS ด้วย SIM800L และส่งข้อมูล HTTP POST ไปยังเซิร์ฟเวอร์
+- เชื่อมต่อ Wi-Fi และส่งข้อมูล HTTP POST ไปยังเซิร์ฟเวอร์
 - มีหน้า System Info แสดง Device ID, Sensor CH และข้อความ `by AIOT LAB`
 - มีการแจ้งเตือน LED/Buzzer เมื่อค่าความเค็มอยู่ในระดับเตือนหรืออันตราย
 - Calibration ด้วยน้ำ DI และสารละลายน้ำที่มีค่า EC เป้าหมาย
@@ -33,6 +34,22 @@
    - target EC = `12.88 ms/cm`
 
 หลัง calibration โปรแกรมจะคำนวณค่า `alpha` และ `beta` และเก็บใน NVS
+
+## การเชื่อมต่อเครือข่าย
+
+ระบบรองรับสองโหมดการส่งข้อมูล:
+
+### โหมด SIM/GPRS
+- ใช้โมดูล SIM800L ในตัวบอร์ด TTGO T-Call V1.4
+- ส่งข้อมูลผ่าน HTTP POST ไปยังเซิร์ฟเวอร์
+- เหมาะสำหรับการใช้งานในพื้นที่ห่างไกลที่ไม่มี Wi-Fi
+
+### โหมด Wi-Fi
+- เชื่อมต่อกับ Wi-Fi hotspot
+- ส่งข้อมูลผ่าน HTTP POST ไปยังเซิร์ฟเวอร์เดียวกัน
+- เหมาะสำหรับการใช้งานในพื้นที่ที่มี Wi-Fi
+
+การเลือกโหมดเครือข่ายสามารถทำได้ผ่านเมนูหรือตั้งค่าในโค้ด
 
 ## ฮาร์ดแวร์ที่ใช้
 
@@ -80,6 +97,7 @@ monitor_speed = 115200
 - `BUZZER` - พิน buzzer
 - `ONE_WIRE` - พิน DS18B20
 - `GPS_RX`, `GPS_TX` - พิน GPS
+- `WIFI_SSID`, `WIFI_PASS` - ชื่อและรหัสผ่าน Wi-Fi hotspot
 - `SIM_APN` - APN ของซิม
 - `HTTP_HOST`, `HTTP_PORT`, `HTTP_PATH` - endpoint สำหรับส่งข้อมูล
 - `DEVICE_ID` - รหัสอุปกรณ์
@@ -91,6 +109,7 @@ monitor_speed = 115200
 - `src/StateMachine.cpp` - ควบคุมสถานะและเมนู
 - `src/Sensor.cpp` - อ่านค่าจาก ADS1115 และ DS18B20
 - `src/Sim.cpp` - จัดการการเชื่อมต่อ SIM/GPRS และส่ง HTTP
+- `src/WifiTask.cpp` - จัดการการเชื่อมต่อ Wi-Fi และส่ง HTTP
 - `src/SalinityCalc.cpp` - คำนวณความเค็มและ calibration
 - `src/SoundManager.cpp` - ควบคุมเสียง buzzer
 - `src/Alarmtask.cpp` - แจ้งเตือน LED/Buzzer ตามค่าความเค็ม
@@ -98,6 +117,8 @@ monitor_speed = 115200
 ## หมายเหตุ
 
 - ตรวจสอบว่า SIM ได้เปิดใช้งานและใส่ซิมเรียบร้อย
+- สำหรับโหมด Wi-Fi ให้ตั้งค่า `WIFI_SSID` และ `WIFI_PASS` ให้ตรงกับ hotspot ที่ต้องการเชื่อมต่อ
+- สามารถเปลี่ยนโหมดเครือข่ายระหว่าง SIM และ Wi-Fi ได้ตามความเหมาะสมของสภาพแวดล้อม
 - ปรับ `SIM_APN` ให้ตรงกับผู้ให้บริการ (DTAC/True/AIS)
 - แหล่งจ่ายไฟต้องเพียงพอสำหรับ SIM800L
 - หน้าจอ `System Info` จะแสดง Device ID และ Sensor CH เป็น `CH0`

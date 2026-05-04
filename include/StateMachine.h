@@ -3,6 +3,7 @@
 #include "shared.h"
 #include "NVSManager.h"
 #include "SoundManager.h"
+#include "WifiTask.h"
 
 // ทุก State ของโปรแกรม
 enum class AppState {
@@ -21,9 +22,10 @@ enum class AppState {
     CAL_SALT,
     CAL_FINISH,
     CAL_CANCEL_CONFIRM,
-    SIM_STATUS,
+    // SIM_STATUS,
     SIM_SENDING,
     SIM_RESULT,
+    NETWORK_MENU, // new
 };
 
 class StateMachine {
@@ -84,4 +86,5 @@ private:
     void _handleSimStatus(ButtonEvent ev);
     void _handleSimSending(ButtonEvent ev);
     void _handleSimResult(ButtonEvent ev);
+    void _handleNetworkMenu(ButtonEvent ev);
 };

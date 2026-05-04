@@ -40,19 +40,18 @@ private:
     void _drawReadGPS();
     void _drawThreshMenu();
     void _drawEditThresh();
-    void _drawCalMenu(); // new
+    void _drawCalMenu();
     void _drawSystemInfo();
-    void _drawCalmanual(); // new
-    void _drawEditCalManual(); // new
+    void _drawCalmanual();
+    void _drawEditCalManual();
     void _drawCalDI();
     void _drawCalSalt();
     void _drawCalFinish(); 
-
-    
     void _drawCalCancelConfirm();
-    void _drawSimStatus();
+    // void _drawSimStatus();
     void _drawSimSending(); 
     void _drawSimResult();
+    void _drawNetworkMenu();
 
     // Helper: พิมพ์ตัวเลขให้ชิดขวาในความกว้างที่กำหนด
     void _printPadded(float val, int decimals, int width);

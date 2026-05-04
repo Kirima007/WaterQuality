@@ -19,7 +19,7 @@
 #define MODEM_PWRKEY     4
 
 // Task settings
-#define SIM_TASK_STACK     12288
+#define SIM_TASK_STACK     8192
 #define SIM_TASK_PRIORITY  1
 #define SIM_TASK_CORE      0
 

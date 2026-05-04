@@ -60,9 +60,10 @@ void StateMachine::handleEvent(ButtonEvent ev) {
         case AppState::CAL_SALT:            _handleCalSalt(ev, sensor);         break;
         case AppState::CAL_FINISH:          _handleCalFinish();                 break;
         case AppState::CAL_CANCEL_CONFIRM:  _handleCalCancelConfirm(ev);        break;
-        case AppState::SIM_STATUS:          _handleSimStatus(ev);               break;
+        // case AppState::SIM_STATUS:          _handleSimStatus(ev);               break;
         case AppState::SIM_SENDING:         _handleSimSending(ev);              break;
         case AppState::SIM_RESULT:          _handleSimResult(ev);               break;
+        case AppState::NETWORK_MENU:        _handleNetworkMenu(ev);             break;
         default: break;
     }
 }
@@ -77,8 +78,13 @@ void StateMachine::_handleMainScreen(ButtonEvent ev) {
         _goTo(AppState::MAIN_MENU);
     }
     else if (ev == ButtonEvent::LONG_PRESS) {
+        if (NVSManager::config.networkMode == NET_MODE_SIM) {
+            SimTask::requestSend();
+        } else {
+            WifiTask::requestSend();
+        }
         requestSound(SoundEvent::SELECT);
-        _goTo(AppState::SIM_STATUS);
+        _goTo(AppState::SIM_SENDING); // (ใช้หน้าจอเดิมได้เลย ประหยัดแรง!)
     }
 }
 
@@ -87,25 +93,26 @@ void StateMachine::_handleMainScreen(ButtonEvent ev) {
 // ==========================================
 void StateMachine::_handleMainMenu(ButtonEvent ev) {
     if (ev == ButtonEvent::ROTATE_CW) {
-        menuIndex = (menuIndex + 1) % 6;
+        menuIndex = (menuIndex + 1) % 7;
         requestSound(SoundEvent::SCROLL);
     } else if (ev == ButtonEvent::ROTATE_CCW) {
-        menuIndex = (menuIndex - 1 + 6) % 6;
+        menuIndex = (menuIndex - 1 + 7) % 7;
         requestSound(SoundEvent::SCROLL);
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         switch (menuIndex) {
             case 0: _goTo(AppState::READ_TEMP);   requestSound(SoundEvent::SELECT); break;
-            case 1: _goTo(AppState::READ_GPS);    requestSound(SoundEvent::SELECT); break;
-            case 2:
+            case 1: _goTo(AppState::NETWORK_MENU); requestSound(SoundEvent::SELECT); break;
+            case 2: _goTo(AppState::READ_GPS);    requestSound(SoundEvent::SELECT); break;
+            case 3:
                 menuIndex = 0;
                 _goTo(AppState::THRESH_MENU);
                 requestSound(SoundEvent::SELECT);
                 break;
-            case 3: 
+            case 4: 
                 menuIndex = 0;
                 _goTo(AppState::CAL_MENU);  requestSound(SoundEvent::SELECT);    break;
-            case 4: _goTo(AppState::SYSTEM_INFO);  requestSound(SoundEvent::SELECT); break;
-            case 5: _goTo(AppState::MAIN_SCREEN);  requestSound(SoundEvent::BACK); break;
+            case 5: _goTo(AppState::SYSTEM_INFO);  requestSound(SoundEvent::SELECT); break;
+            case 6: _goTo(AppState::MAIN_SCREEN);  requestSound(SoundEvent::BACK); break;
         }
     }
 }
@@ -147,6 +154,10 @@ void StateMachine::_handleThreshMenu(ButtonEvent ev) {
                 requestSound(SoundEvent::SELECT);
                 break;
             case 1:
+                editingColor = 'Y';
+                _goTo(AppState::EDIT_THRESH);
+                requestSound(SoundEvent::SELECT);
+                break;
             case 2:
                 editingColor = 'R';
                 _goTo(AppState::EDIT_THRESH);
@@ -172,16 +183,26 @@ void StateMachine::_handleEditThresh(ButtonEvent ev) {
         if (editingColor == 'G') {
             NVSManager::thresh.green += step;
             NVSManager::thresh.green  = constrain(
-                NVSManager::thresh.green, 0.0f,
+                NVSManager::thresh.green, 
+                0.0f, 
+                NVSManager::thresh.yellow - 0.5f
+            );
+        } 
+        else if (editingColor == 'Y') {
+            NVSManager::thresh.yellow += step;
+            NVSManager::thresh.yellow  = constrain(
+                NVSManager::thresh.yellow,
+                NVSManager::thresh.green + 0.5f,
                 NVSManager::thresh.red - 0.5f
             );
-        } else {
+        }
+        else { // กรณีแก้สีแดง ('R')
             NVSManager::thresh.red += step;
             NVSManager::thresh.red  = constrain(
                 NVSManager::thresh.red,
-                NVSManager::thresh.green + 0.5f, 100.0f
+                NVSManager::thresh.yellow + 0.5f,
+                100.0f
             );
-        requestSound(SoundEvent::SELECT);
         }
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         requestSound(SoundEvent::BACK);
@@ -210,7 +231,11 @@ void StateMachine::_handleCalMenu(ButtonEvent ev) {
                 break;
             case 2:  // Send Calib ← ใหม่
                 requestSound(SoundEvent::SELECT);
-                SimTask::requestSendCalib();
+                if (NVSManager::config.networkMode == NET_MODE_SIM) {
+                    SimTask::requestSendCalib();
+                } else {
+                    WifiTask::requestSendCalib();
+                }
                 _goTo(AppState::SIM_SENDING);
                 break;
             case 3:  // Back
@@ -252,7 +277,11 @@ void StateMachine::_handleCalManual(ButtonEvent ev, const SensorData& sensor) {
                 break;
             case 2: // Back
                 menuIndex = 0; // กลับไปชี้ที่เมนู "Manual Calibrate" 
-                SimTask::requestSendCalib();
+                if (NVSManager::config.networkMode == NET_MODE_SIM) {
+                    SimTask::requestSendCalib();
+                } else {
+                    WifiTask::requestSendCalib();
+                }
                 _goTo(AppState::SIM_SENDING);
                 requestSound(SoundEvent::BACK);
                 break;
@@ -383,7 +412,11 @@ void StateMachine::_handleCalFinish() {
         requestSound(SoundEvent::BACK);
     }
 
-    SimTask::requestSendCalib();
+    if (NVSManager::config.networkMode == NET_MODE_SIM) {
+        SimTask::requestSendCalib();
+    } else {
+        WifiTask::requestSendCalib();
+    }
     _goTo(AppState::SIM_SENDING);
 }
 
@@ -411,20 +444,19 @@ void StateMachine::_handleCalCancelConfirm(ButtonEvent ev) {
 // ==========================================
 // SIM_STATUS, SIM_SENDING, SIM_RESULT
 // ==========================================
-void StateMachine::_handleSimStatus(ButtonEvent ev) {
-    if (ev == ButtonEvent::SHORT_PRESS) {
-        requestSound(SoundEvent::BACK);
-        _goTo(AppState::MAIN_SCREEN);
+// void StateMachine::_handleSimStatus(ButtonEvent ev) {
+//     if (ev == ButtonEvent::SHORT_PRESS) {
+//         requestSound(SoundEvent::BACK);
+//         _goTo(AppState::MAIN_SCREEN);
 
-    }
-    else if (ev == ButtonEvent::LONG_PRESS) {
-        SimTask::requestSend();
-        requestSound(SoundEvent::SELECT);
-        _goTo(AppState::SIM_SENDING);
-    }
-}
+//     }
+//     else if (ev == ButtonEvent::LONG_PRESS) {
+//         SimTask::requestSend();
+//         requestSound(SoundEvent::SELECT);
+//         _goTo(AppState::SIM_SENDING);
+//     }
+// }
 void StateMachine::_handleSimSending(ButtonEvent ev) {
-    // กดปุ่มไหนก็ได้ขณะส่ง → ยกเลิกกลับหน้าเดิม
     if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
         requestSound(SoundEvent::BACK);
         _goTo(AppState::MAIN_SCREEN);
@@ -444,4 +476,33 @@ void StateMachine::onSimSendComplete(bool success, int httpCode) {
     if (success) requestSound(SoundEvent::SUCCESS);
     else         requestSound(SoundEvent::BACK);
     _goTo(AppState::SIM_RESULT);
+}
+
+
+
+// ==========================================
+// NETWORK_MENU
+// ==========================================
+void StateMachine::_handleNetworkMenu(ButtonEvent ev) {
+    // ตอนผู้ใช้หมุนลูกบิด
+    if (ev == ButtonEvent::ROTATE_CW || ev == ButtonEvent::ROTATE_CCW) {
+        requestSound(SoundEvent::SCROLL);
+        
+        // สลับโหมด 0 (SIM) กับ 1 (WIFI)
+        if (NVSManager::config.networkMode == NET_MODE_SIM) {
+            NVSManager::config.networkMode = NET_MODE_WIFI;
+        } else {
+            NVSManager::config.networkMode = NET_MODE_SIM;
+        }
+        
+    } 
+    // ตอนผู้ใช้กดปุ่มเพื่อยืนยัน
+    else if (ev == ButtonEvent::SHORT_PRESS) {
+        requestSound(SoundEvent::BACK);
+        
+        NVSManager::saveConfig(); // สั่งเซฟค่าลง EEPROM ทันที!
+        
+        menuIndex = 1; // ตอนเด้งกลับ ให้ลูกศรไปชี้ที่บรรทัด Network เหมือนเดิม
+        _goTo(AppState::MAIN_MENU);
+    }
 }

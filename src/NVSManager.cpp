@@ -6,6 +6,7 @@
 CalibData  NVSManager::calib;
 ThreshData NVSManager::thresh;
 Preferences NVSManager::_prefs;
+SystemConfig NVSManager::config;
 
 // Key names รวมไว้ที่เดียว
 // ถ้าอยากเปลี่ยน key แก้ที่นี่ที่เดียวพอ
@@ -16,7 +17,11 @@ const char* NVSManager::KEY_T_SALT   = "t_salt";
 const char* NVSManager::KEY_ALPHA    = "alpha";   // ← เพิ่ม
 const char* NVSManager::KEY_BETA     = "beta";    // ← เพิ่ม
 const char* NVSManager::KEY_THRESH_G = "th_g";
+const char* NVSManager::KEY_THRESH_Y = "th_y";
 const char* NVSManager::KEY_THRESH_R = "th_r";
+
+const char* NVSManager::KEY_NET_MODE  = "net_mode"; // ← เพิ่ม
+const char* NVSManager::KEY_IS_MUTED  = "is_muted"; // ← เพิ่ม
 
 
 // ==========================================
@@ -35,7 +40,12 @@ void NVSManager::load() {
 
     // โหลด Threshold
     thresh.green = _prefs.getFloat(KEY_THRESH_G, thresh.green);
+    thresh.yellow = _prefs.getFloat(KEY_THRESH_Y, thresh.yellow);
     thresh.red   = _prefs.getFloat(KEY_THRESH_R, thresh.red);
+
+    // โหลด System Config
+    config.networkMode = _prefs.getUInt(KEY_NET_MODE, config.networkMode);
+    config.isMuted = _prefs.getBool(KEY_IS_MUTED, config.isMuted);
 
     _prefs.end();
 }
@@ -60,7 +70,18 @@ void NVSManager::saveCalib() {
 void NVSManager::saveThresh() {
     _prefs.begin(NAMESPACE, false);
     _prefs.putFloat(KEY_THRESH_G, thresh.green);
+    _prefs.putFloat(KEY_THRESH_Y, thresh.yellow);
     _prefs.putFloat(KEY_THRESH_R, thresh.red);
+    _prefs.end();
+}
+
+// ==========================================
+// Save Config
+// ==========================================
+void NVSManager::saveConfig() {
+    _prefs.begin(NAMESPACE, false);
+    _prefs.putUInt(KEY_NET_MODE, config.networkMode);
+    _prefs.putBool(KEY_IS_MUTED, config.isMuted);
     _prefs.end();
 }
 

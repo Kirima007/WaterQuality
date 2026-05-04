@@ -12,6 +12,7 @@
 #include "ScreenManager.h"
 #include "AlarmTask.h"
 #include "Sim.h"
+#include "WifiTask.h"
 
 // ==========================================
 // Objects
@@ -22,7 +23,6 @@ RotaryInput       rotary(ENC_CLK, ENC_DT, ENC_SW);
 StateMachine      stateMachine;
 ScreenManager     screenMgr(lcd, stateMachine);
 AlarmTask         alarmTask(stateMachine);
-
 // ==========================================
 // Queue Handles (สร้างจริงที่นี่)
 // ==========================================
@@ -97,11 +97,16 @@ void setup() {
         ALARM_TASK_STACK, &alarmTask,
         ALARM_TASK_PRIORITY, nullptr, ALARM_TASK_CORE
     );
-        xTaskCreatePinnedToCore(
+    xTaskCreatePinnedToCore(
         SimTask::taskEntry, "SIM",
         SIM_TASK_STACK, &stateMachine,
         SIM_TASK_PRIORITY, nullptr, SIM_TASK_CORE
     );
+    xTaskCreatePinnedToCore(
+        WifiTask::taskEntry, "WiFi",
+        WIFI_TASK_STACK, &stateMachine,
+        WIFI_TASK_PRIORITY, nullptr, WIFI_TASK_CORE
+        );
 
 
     // --- Core 1: UI ---

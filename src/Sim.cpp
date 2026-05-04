@@ -91,6 +91,16 @@ void SimTask::taskEntry(void* param) {
     int failCount = 0; // ตัวนับสำหรับทำ Hard Reset
 
     for (;;) {
+        
+        if (NVSManager::config.networkMode == NET_MODE_WIFI) {
+            // ถ้าใช้ Wi-Fi อยู่ ให้ SIM พักการทำงานและล้างคำสั่งทิ้งไปเลย
+            _connected = false;
+            _sendRequested = false;
+            _sendCalibRequested = false;
+            vTaskDelay(pdMS_TO_TICKS(1000)); 
+            continue; // ข้ามการทำงานรอบนี้ไปเลย
+        }
+
         bool networkOk = false;
         bool gprsOk    = false;
 

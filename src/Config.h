@@ -21,3 +21,11 @@
 #define HTTP_PATH_CALIB "/api/calibrate/salinity"
 #define DEVICE_ID       2                 // ID ของเครื่องนี้
 #define SIM_PUBLISH_MS  30000             // ส่งทุก 30 วิ
+
+
+#define WIFI_SSID "WaterQuality"    // ชื่อ Hotspot ที่ให้ผู้ใช้ตั้งตาม
+#define WIFI_PASS "12345678"        // รหัสผ่าน Hotspot
+
+
+#define NET_MODE_SIM  0             // โหมด 0 คือใช้ SIM800L
+#define NET_MODE_WIFI 1             // โหมด 1 คือใช้ Wi-Fi

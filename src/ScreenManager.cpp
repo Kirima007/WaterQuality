@@ -46,9 +46,10 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::CAL_SALT:             self->_drawCalSalt();           break;
             case AppState::CAL_FINISH:           self->_drawCalFinish();         break;
             case AppState::CAL_CANCEL_CONFIRM:   self->_drawCalCancelConfirm();  break;
-            case AppState::SIM_STATUS:          self->_drawSimStatus();        break;
+            // case AppState::SIM_STATUS:          self->_drawSimStatus();        break;
             case AppState::SIM_SENDING:         self->_drawSimSending();       break;
             case AppState::SIM_RESULT:          self->_drawSimResult();        break;
+            case AppState::NETWORK_MENU:        self->_drawNetworkMenu();  break;
 
         }
 
@@ -87,30 +88,63 @@ void ScreenManager::_drawMainScreen() {
     _lcd.setCursor(0, 0);
     _lcd.print("---SALINITY METER---");
 
+    // ==========================================
+    // บรรทัดที่ 2: ค่า EC (ความเค็ม)
+    // ==========================================
     _lcd.setCursor(0, 1);
-    _lcd.print("Sal : ");
-    _printPadded(_sensor.currentPPT, 2, 5);
-    _lcd.print(" ppt");
+    _lcd.print("EC  : ");
+    _printPadded(_sensor.currentPPT, 2, 5); 
+    _lcd.print(" ppt    "); // เติมช่องว่างเผื่อล้างตัวเลขเก่าที่อาจตกค้าง
 
+    // ==========================================
+    // บรรทัดที่ 3: ค่า Temp (อุณหภูมิ)
+    // ==========================================
     _lcd.setCursor(0, 2);
     _lcd.print("Temp: ");
     _printPadded(_sensor.currentTemp, 1, 5);
-    _lcd.print(" C  ");
+    _lcd.print(" ");
+    _lcd.print((char)223); // พิมพ์สัญลักษณ์องศา (°) ของจอ LCD
+    _lcd.print("C   ");   // เติมช่องว่างเผื่อล้างตัวเลขเก่า
+
+    String netPrefix;
+    String netStatus;
+    
+    if (NVSManager::config.networkMode == NET_MODE_SIM) {
+        netPrefix = "SIM";
+        if (SimTask::isConnected()) {
+            netStatus = "OK " + String(SimTask::getSignalQuality());
+        } else {
+            netStatus = "Wait";
+        }
+    } else {
+        netPrefix = "WIF"; // ใช้ WIF แทน WIFI เพื่อประหยัดโควต้าตัวอักษร
+        if (WifiTask::isConnected()) {
+            netStatus = "OK " + String(WifiTask::getSignalQuality()); // แสดงค่า RSSI ติดลบ (เช่น -65)
+        } else {
+            netStatus = "Wait";
+        }
+    }
+
+    String gpsStatus;
+    if (_gps.valid) {
+        gpsStatus = "Fix " + String(_gps.satellites);
+    } else {
+        gpsStatus = "Wait";
+    }
+    char lcdBuf[21];
+    snprintf(lcdBuf, sizeof(lcdBuf), "%-3s:%-6s|GPS:%-5s", 
+             netPrefix.c_str(), 
+             netStatus.c_str(), 
+             gpsStatus.c_str());
 
     _lcd.setCursor(0, 3);
-    if (_gps.valid) {
-        _lcd.print("GPS:");
-        _lcd.print(_gps.lat, 3);
-        _lcd.print(",");
-        _lcd.print(_gps.lng, 3);
-    } else {
-        _lcd.print("GPS : Wait Lock...  ");
-    }
+    _lcd.print(lcdBuf);
 }
 
 void ScreenManager::_drawMainMenu() {
     const char* items[] = {
         "Read Temp         ",
+        "Network Mode      ",
         "Read GPS          ",
         "LED Threshold     ",
         "Calibrate Mode    ",
@@ -118,7 +152,7 @@ void ScreenManager::_drawMainMenu() {
         "Back              "
     };
 
-    int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, 2);
+    int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, 3);
     for (int i = 0; i < 4; i++) {
         _lcd.setCursor(0, i);
         int idx = startIdx + i;
@@ -142,6 +176,25 @@ void ScreenManager::_drawReadTemp() {
     _lcd.print("Kelvin  : ");
     _printPadded(_sensor.currentTemp + 273.15f, 2, 6);
     _lcd.print(" K");
+}
+
+void ScreenManager::_drawNetworkMenu() {
+    _lcd.setCursor(0, 0);
+    _lcd.print("--- Network Mode ---"); 
+
+    _lcd.setCursor(0, 1);
+    // เว้นช่องว่างให้พอดี 20 ตัวอักษรเพื่อล้างจอไปในตัว
+    if (NVSManager::config.networkMode == NET_MODE_SIM) {
+        _lcd.print("  Select : [ SIM ]  "); 
+    } else {
+        _lcd.print("  Select : [ WIFI]  ");
+    }
+
+    _lcd.setCursor(0, 2);
+    _lcd.print("                    "); // บรรทัดว่าง
+
+    _lcd.setCursor(0, 3);
+    _lcd.print("   Click to Save    ");
 }
 
 void ScreenManager::_drawReadGPS() {
@@ -172,19 +225,19 @@ void ScreenManager::_drawThreshMenu() {
     int idx = _sm.menuIndex;
     _lcd.setCursor(0, 0);
     _lcd.print(idx == 0 ? "> " : "  ");
-    _lcd.print("Green: ");
+    _lcd.print("Green : ");
     _printPadded(NVSManager::thresh.green, 1, 5);
     _lcd.print(" ppt");
 
     _lcd.setCursor(0, 1);
     _lcd.print(idx == 1 ? "> " : "  ");
-    _lcd.print("Blue : ");
-    _printPadded(NVSManager::thresh.red, 1, 5);
+    _lcd.print("Yellow: ");
+    _printPadded(NVSManager::thresh.yellow, 1, 5);
     _lcd.print(" ppt");
 
     _lcd.setCursor(0, 2);
     _lcd.print(idx == 2 ? "> " : "  ");
-    _lcd.print("Red  : ");
+    _lcd.print("Red   : ");
     _printPadded(NVSManager::thresh.red, 1, 5);
     _lcd.print(" ppt");
 
@@ -195,19 +248,28 @@ void ScreenManager::_drawThreshMenu() {
 void ScreenManager::_drawEditThresh() {
     _lcd.setCursor(0, 0);
     _lcd.print("--- Set Limit ---   ");
+
     _lcd.setCursor(0, 1);
+    float val = 0.0f;
+    
     if (_sm.editingColor == 'G') {
         _lcd.print("Max Green (G) limit ");
-    } else {
-        _lcd.print("Max Blue  (B) limit ");
+        val = NVSManager::thresh.green;
+    } 
+    else if (_sm.editingColor == 'Y') {
+        _lcd.print("Max Yellow(Y) limit ");
+        val = NVSManager::thresh.yellow;
+    } 
+    else {
+        _lcd.print("Max Red (R) limit   ");
+        val = NVSManager::thresh.red;
     }
+
     _lcd.setCursor(0, 2);
-    float val = (_sm.editingColor == 'G')
-        ? NVSManager::thresh.green
-        : NVSManager::thresh.red;
     _lcd.print("      [");
-    _printPadded(val, 1, 5);
-    _lcd.print("]      ");
+    _printPadded(val, 1, 5); 
+    _lcd.print("]       ");
+
     _lcd.setCursor(0, 3);
     _lcd.print("   Click to Save    ");
 }
@@ -344,41 +406,43 @@ void ScreenManager::_drawCalCancelConfirm() {
     }
 }
 
-void ScreenManager::_drawSimStatus() {
-    _lcd.setCursor(0, 0);
-    _lcd.print("--- Send Data ---   ");
 
-    // แถว 1: สถานะ SIM + Signal Quality
-    _lcd.setCursor(0, 1);
-    int sig = SimTask::getSignalQuality();
-    if (!SimTask::isConnected()) {
-        _lcd.print("SIM : No Network... ");
-    } else if (sig == 99 || sig == 0) {
-        _lcd.print("SIM : No Signal (99) ");
-    } else {
-        _lcd.print("SIM : OK (");
-        _lcd.print(sig);
-        _lcd.print("/31)");
-    }
 
-    // แถว 2: สถานะ GPS
-    _lcd.setCursor(0, 2);
-    if (_gps.valid) {
-        _lcd.print("GPS : Lock  ");
-        _lcd.print(_gps.satellites);
-        _lcd.print("sat        ");
-    } else {
-        _lcd.print("GPS : No Lock...    ");
-    }
+// void ScreenManager::_drawSimStatus() {
+//     _lcd.setCursor(0, 0);
+//     _lcd.print("--- Send Data ---   ");
 
-    // แถว 3: ค่า Sensor
-    _lcd.setCursor(0, 3);
-    _lcd.print("S:");
-    _lcd.print(_sensor.currentPPT, 1);
-    _lcd.print("ppt T:");
-    _lcd.print(_sensor.currentTemp, 1);
-    _lcd.print("C  ");
-}
+//     // แถว 1: สถานะ SIM + Signal Quality
+//     _lcd.setCursor(0, 1);
+//     int sig = SimTask::getSignalQuality();
+//     if (!SimTask::isConnected()) {
+//         _lcd.print("SIM : No Network... ");
+//     } else if (sig == 99 || sig == 0) {
+//         _lcd.print("SIM : No Signal (99) ");
+//     } else {
+//         _lcd.print("SIM : OK (");
+//         _lcd.print(sig);
+//         _lcd.print("/31)");
+//     }
+
+//     // แถว 2: สถานะ GPS
+//     _lcd.setCursor(0, 2);
+//     if (_gps.valid) {
+//         _lcd.print("GPS : Lock  ");
+//         _lcd.print(_gps.satellites);
+//         _lcd.print("sat        ");
+//     } else {
+//         _lcd.print("GPS : No Lock...    ");
+//     }
+
+//     // แถว 3: ค่า Sensor
+//     _lcd.setCursor(0, 3);
+//     _lcd.print("S:");
+//     _lcd.print(_sensor.currentPPT, 1);
+//     _lcd.print("ppt T:");
+//     _lcd.print(_sensor.currentTemp, 1);
+//     _lcd.print("C  ");
+// }
 
 
 void ScreenManager::_drawSimSending() {
