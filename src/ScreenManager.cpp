@@ -50,7 +50,8 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::SIM_SENDING:         self->_drawSimSending();       break;
             case AppState::SIM_RESULT:          self->_drawSimResult();        break;
             case AppState::NETWORK_MENU:        self->_drawNetworkMenu();  break;
-
+            case AppState::NETWORK_STATUS:      self->_drawNetworkStatus();  break;
+            case AppState::BUZZER_MENU:         self->_drawBuzzerMenu();  break;
         }
 
         vTaskDelay(pdMS_TO_TICKS(DISPLAY_TASK_DELAY_MS));
@@ -132,7 +133,7 @@ void ScreenManager::_drawMainScreen() {
         gpsStatus = "Wait";
     }
     char lcdBuf[21];
-    snprintf(lcdBuf, sizeof(lcdBuf), "%-3s:%-6s|GPS:%-5s", 
+    snprintf(lcdBuf, sizeof(lcdBuf), "%-3.3s:%-6.6s|GPS:%-5.5s", 
              netPrefix.c_str(), 
              netStatus.c_str(), 
              gpsStatus.c_str());
@@ -142,22 +143,66 @@ void ScreenManager::_drawMainScreen() {
 }
 
 void ScreenManager::_drawMainMenu() {
-    const char* items[] = {
-        "Read Temp         ",
-        "Network Mode      ",
-        "Read GPS          ",
-        "LED Threshold     ",
-        "Calibrate Mode    ",
-        "System Info       ",
-        "Back              "
+    const int totalItems = 9; // จำนวนเมนูทั้งหมด
+    const char* items[totalItems] = {
+        "Read Temp",
+        "Network Status", 
+        "Network Mode", 
+        "Read GPS",
+        "LED Threshold", 
+        "Calibrate Mode", 
+        "Buzzer Enable", 
+        "System Info", 
+        "Back"
     };
 
-    int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, 3);
+    static int lastScrollIndex = -1;
+    
+    // สร้างภาพใหม่เฉพาะตอนที่เมนูมีการเลื่อนเท่านั้น (ป้องกันจอกระพริบ)
+    if (_sm.menuIndex != lastScrollIndex) {
+        lastScrollIndex = _sm.menuIndex;
+        
+        int thumbHeight = 8; // ความสูงของแถบเลื่อน (8 พิกเซล = 1 บรรทัดพอดี)
+        int maxOffset = 32 - thumbHeight; // พื้นที่ให้เลื่อนได้ทั้งหมด 24 พิกเซล
+        int offset = (_sm.menuIndex * maxOffset) / (totalItems - 1); // คำนวณจุดเริ่ม
+
+        for (int row = 0; row < 4; row++) {
+            uint8_t charData[8];
+            int rowPixelStart = row * 8;
+            
+            for (int p = 0; p < 8; p++) {
+                int absolutePixel = rowPixelStart + p;
+                
+                // ถ้าพิกเซลนี้อยู่ในช่วงของแถบเลื่อน ให้วาดเส้นหนา
+                if (absolutePixel >= offset && absolutePixel < offset + thumbHeight) {
+                    charData[p] = 0b01110; // Thumb หนา 3 พิกเซลตรงกลาง
+                } else {
+                    charData[p] = 0b00100; // Track เส้นบาง 1 พิกเซล
+                }
+            }
+            _lcd.createChar(row, charData);
+        }
+    }
+
+    // ==========================================
+    // วาดข้อความเมนู และโชว์ Scrollbar
+    // ==========================================
+    int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, totalItems - 4); 
+    
     for (int i = 0; i < 4; i++) {
-        _lcd.setCursor(0, i);
         int idx = startIdx + i;
+        
+        _lcd.setCursor(0, i);
         _lcd.print(_sm.menuIndex == idx ? "> " : "  ");
-        _lcd.print(items[idx]);
+        
+        // พิมพ์ชื่อเมนู (จองพื้นที่ 16 ตัวอักษร)
+        char buf[18];
+        snprintf(buf, sizeof(buf), "%-16.16s", items[idx]);
+        _lcd.print(buf);
+
+        // แสดง Scrollbar สุดเนียนที่คอลัมน์ขวาสุด
+        _lcd.setCursor(19, i);
+        _lcd.write((uint8_t)i); // เรียกใช้ Custom Char เบอร์ 0 ถึง 3 ตามบรรทัด
     }
 }
 
@@ -197,27 +242,42 @@ void ScreenManager::_drawNetworkMenu() {
     _lcd.print("   Click to Save    ");
 }
 
+// ==========================================
+// READ_GPS
+// ==========================================
 void ScreenManager::_drawReadGPS() {
+    char buf[21];
     _lcd.setCursor(0, 0);
-    _lcd.print("--- GPS Data ---    ");
+    _lcd.print("--- GPS Status -----");
+
     if (_gps.valid) {
+        // บรรทัด 2: ละติจูด
         _lcd.setCursor(0, 1);
-        _lcd.print("Lat: ");
-        _lcd.print(_gps.lat, 5);
+        snprintf(buf, sizeof(buf), "Lat: %-14.5f", _gps.lat);
+        _lcd.print(buf);
+
+        // บรรทัด 3: ลองจิจูด
         _lcd.setCursor(0, 2);
-        _lcd.print("Lon: ");
-        _lcd.print(_gps.lng, 5);
+        snprintf(buf, sizeof(buf), "Lon: %-14.5f", _gps.lng);
+        _lcd.print(buf);
+
+        // บรรทัด 4: จำนวนดาวเทียม และสถานะ
         _lcd.setCursor(0, 3);
-        _lcd.print("Satellites: ");
-        _lcd.print(_gps.satellites);
-        _lcd.print("   ");
+        snprintf(buf, sizeof(buf), "Satellites: %-2d  [OK]", _gps.satellites);
+        _lcd.print(buf);
+
     } else {
         _lcd.setCursor(0, 1);
-        _lcd.print("Searching Pos...    ");
+        _lcd.print("Searching signal... ");
+        
+        // บรรทัด 3: คำแนะนำ
         _lcd.setCursor(0, 2);
         _lcd.print("Move to open sky.   ");
+        
+        // บรรทัด 4: โชว์จำนวนดาวเทียมที่เจอ (แม้จะยังไม่ Lock พิกัด)
         _lcd.setCursor(0, 3);
-        _lcd.print("                    ");
+        snprintf(buf, sizeof(buf), "Satellites: %-2d      ", _gps.satellites);
+        _lcd.print(buf);
     }
 }
 
@@ -290,22 +350,30 @@ void ScreenManager::_drawCalMenu() {
 }
 
 
+// ==========================================
+// SYSTEM_INFO
+// ==========================================
 void ScreenManager::_drawSystemInfo() {
+    char buf[21];
+
+    // บรรทัด 1: หัวข้อ
     _lcd.setCursor(0, 0);
     _lcd.print("--- System Info ----");
 
+    // บรรทัด 2: Device ID 
     _lcd.setCursor(0, 1);
-    char buf1[21];
-    sprintf(buf1, "Device ID: %-9d", DEVICE_ID);
-    _lcd.print(buf1);
+    snprintf(buf, sizeof(buf), "Device ID : %-9d", DEVICE_ID);
+    _lcd.print(buf);
 
+    // บรรทัด 3: Firmware Version (ดึงจาก #define)
     _lcd.setCursor(0, 2);
-    char buf2[21];
-    sprintf(buf2, "Sensor CH: %-9s", "CH0");
-    _lcd.print(buf2);
+    // พิมพ์คำว่า "Firmware: " (8 ตัวอักษร) + ตัวแปรข้อความเผื่อไว้ 12 ตัวอักษร รวมเป็น 20 พอดี
+    snprintf(buf, sizeof(buf), "Firmware  : %-12.12s", FW_VERSION); 
+    _lcd.print(buf);
 
+    // บรรทัด 4: เครดิต
     _lcd.setCursor(0, 3);
-    _lcd.print("by MARID (AIOT LAB) ");
+    _lcd.print("By AIOT LAB (KMITL) "); 
 }
 
 
@@ -347,48 +415,43 @@ void ScreenManager::_drawEditCalManual() {
 }
 
 void ScreenManager::_drawCalDI() {
+    char buf[21];
     _lcd.setCursor(0, 0);
-    _lcd.print("1. Insert Water     ");
+    _lcd.print("1. Insert Water     "); 
     _lcd.setCursor(0, 1);
-    _lcd.print("Target: 1.413 us/cm");
+    _lcd.print("Target: 1.413 us/cm ");
     _lcd.setCursor(0, 2);
-    _lcd.print("V:");
-    _lcd.print(_sensor.currentVolt, 4);
-    _lcd.print(" T:");
-    _lcd.print(_sensor.currentTemp, 1);
-    _lcd.print("C   ");
+    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.currentVolt, _sensor.currentTemp);
+    _lcd.print(buf);
     _lcd.setCursor(0, 3);
-    _lcd.print("Click  to Cancel    ");
+    _lcd.print("Click to Cancel     ");
 }
 
 void ScreenManager::_drawCalSalt() {
+    char buf[21];
     _lcd.setCursor(0, 0);
-    _lcd.print("2. Insert Water     ");
+    _lcd.print("1. Insert Water     "); 
     _lcd.setCursor(0, 1);
-    _lcd.print("Target: 12.88 ms/cm");
+    _lcd.print("Target: 12.88 ms/cm ");
     _lcd.setCursor(0, 2);
-    _lcd.print("V:");
-    _lcd.print(_sensor.currentVolt, 4);
-    _lcd.print(" T:");
-    _lcd.print(_sensor.currentTemp, 1);
-    _lcd.print("C   ");
+    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.currentVolt, _sensor.currentTemp);
+    _lcd.print(buf);
     _lcd.setCursor(0, 3);
-    _lcd.print("Click  to Cancel    ");
+    _lcd.print("Click to Cancel     ");
 }
 
 void ScreenManager::_drawCalFinish() {
-    _lcd.setCursor(0, 0); _lcd.print("--- Calibration --- ");
-    _lcd.setCursor(0, 1); _lcd.print("   Calibrating...   ");
-    _lcd.setCursor(0, 2); _lcd.print("   Saving to NVS    ");
-    _lcd.setCursor(0, 3); _lcd.print("                    ");
+    _lcd.setCursor(0, 0); 
+    _lcd.print("--- Calibration --- ");
     
-    vTaskDelay(pdMS_TO_TICKS(1500)); // รอ 1.5 วิ
-
-    _lcd.setCursor(0, 1); _lcd.print("  Calibrate Finish! ");
-    _lcd.setCursor(0, 2); _lcd.print("     Success!!!     ");
-    requestSound(SoundEvent::SUCCESS);
+    _lcd.setCursor(0, 1); 
+    _lcd.print("  Calibrate Finish! ");
     
-    vTaskDelay(pdMS_TO_TICKS(2000)); // รอ 2 วิ
+    _lcd.setCursor(0, 2); 
+    _lcd.print("     Success!!!     ");
+    
+    _lcd.setCursor(0, 3); 
+    _lcd.print("                    ");
 }
 
 void ScreenManager::_drawCalCancelConfirm() {
@@ -468,4 +531,78 @@ void ScreenManager::_drawSimResult() {
         _lcd.print(buf);
     }
     _lcd.setCursor(0, 3); _lcd.print(" Click to go back   ");
+}
+
+// ==========================================
+// NETWORK_STATUS
+// ==========================================
+void ScreenManager::_drawNetworkStatus() {
+    char buf[21]; 
+
+    if (NVSManager::config.networkMode == NET_MODE_WIFI) {
+        // --- 🟢 โหมด Wi-Fi ---
+        _lcd.setCursor(0, 0);
+        _lcd.print("--- WIFI STATUS ----");
+
+        _lcd.setCursor(0, 1);
+        snprintf(buf, sizeof(buf), "SSID:%-15.15s", WIFI_SSID);
+        _lcd.print(buf);
+
+        _lcd.setCursor(0, 2);
+        snprintf(buf, sizeof(buf), "PASS:%-15.15s", WIFI_PASS);
+        _lcd.print(buf);
+
+        _lcd.setCursor(0, 3);
+        if (WifiTask::isConnected()) {
+            snprintf(buf, sizeof(buf), "Stat:OK    RSSI:%-3d", WifiTask::getSignalQuality());
+        } else {
+            snprintf(buf, sizeof(buf), "Stat:WAIT  RSSI:-- ");
+        }
+        _lcd.print(buf);
+
+    } else {
+        // --- 🔵 โหมด SIM ---
+        _lcd.setCursor(0, 0);
+        _lcd.print("--- SIM STATUS -----");
+
+        _lcd.setCursor(0, 1);
+        snprintf(buf, sizeof(buf), "APN :%-15.15s", SIM_APN);
+        _lcd.print(buf);
+
+        _lcd.setCursor(0, 2);
+        _lcd.print("Type:GPRS / SIM800L ");
+
+        _lcd.setCursor(0, 3);
+        if (SimTask::isConnected()) {
+            snprintf(buf, sizeof(buf), "Stat:OK    CSQ :%-2d ", SimTask::getSignalQuality());
+        } else {
+            snprintf(buf, sizeof(buf), "Stat:WAIT  CSQ :--  ");
+        }
+        _lcd.print(buf);
+    }
+}
+
+// ==========================================
+// BUZZER_MENU
+// ==========================================
+void ScreenManager::_drawBuzzerMenu() {
+    _lcd.setCursor(0, 0);
+    _lcd.print("--- Buzzer Mode ----"); 
+
+    _lcd.setCursor(0, 1);
+    
+    // ตรวจสอบค่า Mute จาก Config
+    // isMuted = true แปลว่า "ปิดเสียง"
+    // isMuted = false แปลว่า "เปิดเสียง"
+    if (!NVSManager::config.isMuted) {
+        _lcd.print("  Select : [ ON ]   "); 
+    } else {
+        _lcd.print("  Select : [ OFF]   ");
+    }
+
+    _lcd.setCursor(0, 2);
+    _lcd.print("                    "); // เคลียร์หน้าจอบรรทัดนี้
+
+    _lcd.setCursor(0, 3);
+    _lcd.print("   Click to Save    ");
 }

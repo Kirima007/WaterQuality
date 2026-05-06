@@ -52,6 +52,8 @@ private:
     void _drawSimSending(); 
     void _drawSimResult();
     void _drawNetworkMenu();
+    void _drawNetworkStatus();
+    void _drawBuzzerMenu();
 
     // Helper: พิมพ์ตัวเลขให้ชิดขวาในความกว้างที่กำหนด
     void _printPadded(float val, int decimals, int width);

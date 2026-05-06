@@ -10,7 +10,7 @@
 // ค่าตั้งต้นที่ปรับได้
 #define ROTARY_DEBOUNCE_MS   10    // debounce ปุ่ม
 #define ROTARY_LONG_PRESS_MS 1500  // กดค้างกี่ ms ถึงเป็น Long Press
-#define ROTARY_TASK_DELAY_MS 10    // ความเร็วในการสแกน
+#define ROTARY_TASK_DELAY_MS 20    // ความเร็วในการสแกน
 
 class RotaryInput {
 public:

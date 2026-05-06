@@ -70,7 +70,7 @@ void AlarmTask::taskEntry(void* param) {
                 self->_setRGB(1, 1, 0);
                 alarmStep = (alarmStep + 1) % 8;
                 if (alarmStep == 0) {
-                    tone(BUZZER, 3500, 100);
+                    if (!NVSManager::config.isMuted) tone(BUZZER, 3500, 100);
                 }
 
             } else if (ppt <= thR) {
@@ -78,13 +78,13 @@ void AlarmTask::taskEntry(void* param) {
                 self->_setRGB(1, 0, 0);
                 alarmStep = (alarmStep + 1) % 8;
                 if (alarmStep == 0 || alarmStep == 2 || alarmStep == 4) {
-                    tone(BUZZER, 3500, 100);
+                    if (!NVSManager::config.isMuted) tone(BUZZER, 3500, 100);
                 }
 
             } else {
                 alarmStep = (alarmStep + 1) % 8;
                 self->_setRGB(alarmStep % 2, 0, 0); // ไฟแดงกระพริบ
-                tone(BUZZER, 3500, 200);            // เสียงเตือนยาวขึ้น
+                if (!NVSManager::config.isMuted) tone(BUZZER, 3500, 200);            // เสียงเตือนยาวขึ้น
             }
 
         }

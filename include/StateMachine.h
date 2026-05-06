@@ -25,7 +25,9 @@ enum class AppState {
     // SIM_STATUS,
     SIM_SENDING,
     SIM_RESULT,
+    NETWORK_STATUS,
     NETWORK_MENU, // new
+    BUZZER_MENU, // new
 };
 
 class StateMachine {
@@ -87,4 +89,6 @@ private:
     void _handleSimSending(ButtonEvent ev);
     void _handleSimResult(ButtonEvent ev);
     void _handleNetworkMenu(ButtonEvent ev);
+    void _handleNetworkStatus(ButtonEvent ev); // new
+    void _handleBuzzerMenu(ButtonEvent ev); // new
 };
