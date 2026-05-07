@@ -7,6 +7,7 @@ public:
 
     // ฟังก์ชันหลักสำหรับคำนวณ
     static float calculate(float volt, float tempC, float alpha, float beta);
+    static float calculateEC(float volt, float tempC, float alpha, float beta);
     static bool computeAlphaBeta(float v_di, float t_di, 
                                  float v_salt, float t_salt, 
                                  float &alphaOut, float &betaOut);

@@ -87,26 +87,21 @@ void ScreenManager::_drawStartup() {
 
 void ScreenManager::_drawMainScreen() {
     _lcd.setCursor(0, 0);
-    _lcd.print("---SALINITY METER---");
+    _lcd.print("SAL : ");
+    _printPadded(_sensor.currentPPT, 2, 5); 
+    _lcd.print(" ppt     "); // เคาะสเปซบาร์ด้านหลัง 5 ที
 
-    // ==========================================
-    // บรรทัดที่ 2: ค่า EC (ความเค็ม)
-    // ==========================================
     _lcd.setCursor(0, 1);
     _lcd.print("EC  : ");
-    _printPadded(_sensor.currentPPT, 2, 5); 
-    _lcd.print(" ppt    "); // เติมช่องว่างเผื่อล้างตัวเลขเก่าที่อาจตกค้าง
+    _printPadded(_sensor.currentEC, 2, 5); 
+    _lcd.print(" mS/cm   "); // เคาะสเปซบาร์ด้านหลัง 3 ที
 
-    // ==========================================
-    // บรรทัดที่ 3: ค่า Temp (อุณหภูมิ)
-    // ==========================================
     _lcd.setCursor(0, 2);
     _lcd.print("Temp: ");
     _printPadded(_sensor.currentTemp, 1, 5);
     _lcd.print(" ");
-    _lcd.print((char)223); // พิมพ์สัญลักษณ์องศา (°) ของจอ LCD
-    _lcd.print("C   ");   // เติมช่องว่างเผื่อล้างตัวเลขเก่า
-
+    _lcd.print((char)223); // สัญลักษณ์องศา (°)
+    _lcd.print("C      "); // เคาะสเปซบาร์ด้านหลัง 6 ที
     String netPrefix;
     String netStatus;
     
@@ -118,9 +113,9 @@ void ScreenManager::_drawMainScreen() {
             netStatus = "Wait";
         }
     } else {
-        netPrefix = "WIF"; // ใช้ WIF แทน WIFI เพื่อประหยัดโควต้าตัวอักษร
+        netPrefix = "WIF"; 
         if (WifiTask::isConnected()) {
-            netStatus = "OK " + String(WifiTask::getSignalQuality()); // แสดงค่า RSSI ติดลบ (เช่น -65)
+            netStatus = "OK " + String(WifiTask::getSignalQuality());
         } else {
             netStatus = "Wait";
         }
@@ -132,11 +127,10 @@ void ScreenManager::_drawMainScreen() {
     } else {
         gpsStatus = "Wait";
     }
+
     char lcdBuf[21];
     snprintf(lcdBuf, sizeof(lcdBuf), "%-3.3s:%-6.6s|GPS:%-5.5s", 
-             netPrefix.c_str(), 
-             netStatus.c_str(), 
-             gpsStatus.c_str());
+            netPrefix.c_str(), netStatus.c_str(), gpsStatus.c_str());
 
     _lcd.setCursor(0, 3);
     _lcd.print(lcdBuf);

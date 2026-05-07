@@ -7,6 +7,7 @@ struct SensorData {
     float currentTemp; // อุณหภูมิ °C
     float currentVolt; // แรงดันจาก ADS1115
     float currentPPT; // PPT
+    float currentEC;
     long int timestamp; 
 };
 

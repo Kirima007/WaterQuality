@@ -29,12 +29,19 @@ bool SalinityCalc::computeAlphaBeta(float v_di, float t_di,
 }
 
 float SalinityCalc::calculate(float volt, float tempC, float alpha, float beta) {
-    float ec25_current = calcEC25(volt, tempC);
+    float ecFinal = calculateEC(volt, tempC, alpha, beta);
     
-    // เอา Alpha/Beta ที่เซฟไว้ใน EEPROM มาปรับแก้ EC
-    float ecFinal = (alpha * ec25_current) + beta;
-    
-    // แปลงกลับเป็น PPT
+    if (ecFinal <= 0.0f) {//กรองกรณี EC ติดลบหรือเป็นศูนย์ (ซึ่งไม่สมเหตุสมผล) ให้คืนค่า Salinity เป็น 0.0 ppt แทน
+        return 0.0f;
+    }
+    // แปลงจาก EC (mS/cm) เป็น Salinity (PPT)
+    // salinity = (0.4803 \times ecFinal) + 0.1634$$
     float salinity = (0.4803f * ecFinal) + 0.1634f;
     return max(0.0f, salinity);
+}
+
+float SalinityCalc::calculateEC(float volt, float tempC, float alpha, float beta) {
+    float ec25_current = calcEC25(volt, tempC);
+    float ecFinal = (alpha * ec25_current) + beta;
+    return max(0.0f, ecFinal);
 }

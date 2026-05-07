@@ -71,6 +71,13 @@ void SensorTask::taskEntry(void* param) {
         data.currentVolt  = ads.computeVolts(rawAvg);
 
         // ดึงค่า calibration จาก NVSManager มาเข้าสมการของ SalinityCalc
+
+        data.currentEC = SalinityCalc::calculateEC(
+            data.currentVolt,
+            data.currentTemp,
+            NVSManager::calib.alpha,
+            NVSManager::calib.beta
+        );
         data.currentPPT = SalinityCalc::calculate(
             data.currentVolt,
             data.currentTemp,
