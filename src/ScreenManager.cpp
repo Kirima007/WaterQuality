@@ -150,53 +150,42 @@ void ScreenManager::_drawMainMenu() {
         "Back"
     };
 
-    static int lastScrollIndex = -1;
-    
-    // สร้างภาพใหม่เฉพาะตอนที่เมนูมีการเลื่อนเท่านั้น (ป้องกันจอกระพริบ)
-    if (_sm.menuIndex != lastScrollIndex) {
-        lastScrollIndex = _sm.menuIndex;
-        
-        int thumbHeight = 8; // ความสูงของแถบเลื่อน (8 พิกเซล = 1 บรรทัดพอดี)
-        int maxOffset = 32 - thumbHeight; // พื้นที่ให้เลื่อนได้ทั้งหมด 24 พิกเซล
-        int offset = (_sm.menuIndex * maxOffset) / (totalItems - 1); // คำนวณจุดเริ่ม
-
-        for (int row = 0; row < 4; row++) {
-            uint8_t charData[8];
-            int rowPixelStart = row * 8;
-            
-            for (int p = 0; p < 8; p++) {
-                int absolutePixel = rowPixelStart + p;
-                
-                // ถ้าพิกเซลนี้อยู่ในช่วงของแถบเลื่อน ให้วาดเส้นหนา
-                if (absolutePixel >= offset && absolutePixel < offset + thumbHeight) {
-                    charData[p] = 0b01110; // Thumb หนา 3 พิกเซลตรงกลาง
-                } else {
-                    charData[p] = 0b00100; // Track เส้นบาง 1 พิกเซล
-                }
-            }
-            _lcd.createChar(row, charData);
-        }
-    }
-
-    // ==========================================
-    // วาดข้อความเมนู และโชว์ Scrollbar
-    // ==========================================
+    // คำนวณ index เริ่มต้น
     int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, totalItems - 4); 
     
+    // เตรียมตัวเลข "2/9" รอไว้ก่อนเลย
+    char pageStr[8];
+    snprintf(pageStr, sizeof(pageStr), "%d/%d", _sm.menuIndex + 1, totalItems);
+    int pageLen = strlen(pageStr); // นับว่าตัวเลขกินที่กี่ตัวอักษร (เช่น "2/9" = 3 ตัว)
+
+    // ==========================================
+    // วาดข้อความเมนู
+    // ==========================================
     for (int i = 0; i < 4; i++) {
         int idx = startIdx + i;
-        
         _lcd.setCursor(0, i);
-        _lcd.print(_sm.menuIndex == idx ? "> " : "  ");
         
-        // พิมพ์ชื่อเมนู (จองพื้นที่ 16 ตัวอักษร)
-        char buf[18];
-        snprintf(buf, sizeof(buf), "%-16.16s", items[idx]);
-        _lcd.print(buf);
-
-        // แสดง Scrollbar สุดเนียนที่คอลัมน์ขวาสุด
-        _lcd.setCursor(19, i);
-        _lcd.write((uint8_t)i); // เรียกใช้ Custom Char เบอร์ 0 ถึง 3 ตามบรรทัด
+        if (idx < totalItems) {
+            // เตรียมลูกศร
+            const char* prefix = (_sm.menuIndex == idx) ? "> " : "  ";
+            char buf[21]; 
+            
+            if (i == 0) {
+                // บรรทัดบนสุด (i=0): ประกอบร่าง [ลูกศร] + [ชื่อเมนู] + [ตัวเลขหน้า]
+                int nameSpace = 18 - pageLen; // คำนวณช่องว่างที่เหลือให้ชื่อเมนู
+                
+                // ใช้เทคนิค %-*.*s เพื่อหดช่องว่างของชื่อเมนูหลบให้ตัวเลขหน้าแบบอัตโนมัติ
+                snprintf(buf, sizeof(buf), "%s%-*.*s%s", prefix, nameSpace, nameSpace, items[idx], pageStr);
+                _lcd.print(buf);
+            } else {
+                // บรรทัดอื่นๆ: ประกอบร่าง [ลูกศร] + [ชื่อเมนู และเติมช่องว่างจนสุดขอบจอ]
+                snprintf(buf, sizeof(buf), "%s%-18.18s", prefix, items[idx]);
+                _lcd.print(buf);
+            }
+        } else {
+            // ล้างบรรทัดที่ว่างเปล่า
+            _lcd.print("                    ");
+        }
     }
 }
 
