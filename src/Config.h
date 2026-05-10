@@ -4,16 +4,21 @@
 #define ENC_CLK 32
 #define ENC_DT 33
 #define ENC_SW 14
-#define RGB_R 9
-#define RGB_G 13
-#define RGB_B 12
-// #define RGB_R 15
-// #define RGB_G 13
-// #define RGB_B 12
 #define BUZZER 2
 #define ONE_WIRE 18
 #define GPS_RX 19
 #define GPS_TX 25
+
+
+#if SENSOR_COUNT == 1
+    #define RGB_R 9
+    #define RGB_G 13
+    #define RGB_B 12
+#else
+    #define RGB_R 15
+    #define RGB_G 13
+    #define RGB_B 12
+#endif
 
 #define STARTUP_DELAY_MS 1500   // หน้า star+tup แสดงกี่ ms
 
