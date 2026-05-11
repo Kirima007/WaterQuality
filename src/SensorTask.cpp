@@ -40,7 +40,7 @@ void SensorTask::taskEntry(void* param) {
 
     // --- ตัวแปรภายใน Task ---
     SensorData data{};
-    data.currentTemp = 25.0f; // ตั้งค่าเริ่มต้นเป็น 25 องศา เผื่อเซ็นเซอร์อ่านไม่ได้
+    data.tempC = 25.0f; // ตั้งค่าเริ่มต้นเป็น 25 องศา เผื่อเซ็นเซอร์อ่านไม่ได้
     bool tempReady = false;
 
     // Request อุณหภูมิครั้งแรก
@@ -56,10 +56,10 @@ void SensorTask::taskEntry(void* param) {
 
             // เช็คว่าอ่านค่าได้จริง
             if (t != DEVICE_DISCONNECTED_C && t > -20.0f && t < 80.0f) {
-                data.currentTemp = t;
+                data.tempC = t;
             } else {
                 // Fallback: ถ้าระบบหาเซ็นเซอร์อุณหภูมิไม่เจอ ให้ล็อกค่าไว้ที่ 25°C 
-                data.currentTemp = 25.0f; 
+                data.tempC = 25.0f; 
             }
         }
 
@@ -68,21 +68,21 @@ void SensorTask::taskEntry(void* param) {
         tempReady = true;
 
         int16_t rawAvg    = readADSAvg(ads, 0, 10);
-        data.currentVolt  = ads.computeVolts(rawAvg);
+        data.voltEC  = ads.computeVolts(rawAvg);
 
         // ดึงค่า calibration จาก NVSManager มาเข้าสมการของ SensorMath
 
-        data.currentEC = SensorMath::calculateEC(
-            data.currentVolt,
-            data.currentTemp,
-            NVSManager::calib.alpha,
-            NVSManager::calib.beta
+        data.valEC = SensorMath::calculateEC(
+            data.voltEC,
+            data.tempC,
+            NVSManager::calibEC.alpha,
+            NVSManager::calibEC.beta
         );
-        data.currentPPT = SensorMath::calculate(
-            data.currentVolt,
-            data.currentTemp,
-            NVSManager::calib.alpha,
-            NVSManager::calib.beta
+        data.valPPT = SensorMath::calculate(
+            data.voltEC,
+            data.tempC,
+            NVSManager::calibEC.alpha,
+            NVSManager::calibEC.beta
         );
 
         data.timestamp = millis();

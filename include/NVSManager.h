@@ -4,12 +4,8 @@
 
 // ข้อมูล Calibration
 struct CalibData {
-    float v_di   = 0.0004f;  // แรงดัน DI water
-    float v_salt = 0.4746f;  // แรงดัน 35ppt solution
-    float t_salt = 23.50f;   // อุณหภูมิตอน calibrate
-
-    float alpha = 1.0f; 
-    float beta  = 0.0f;
+    float alpha = 1.0f;
+    float beta = 0.0f;
 };
 
 // ข้อมูล Threshold
@@ -20,8 +16,8 @@ struct ThreshData {
 };
 
 struct SystemConfig {
-    uint8_t networkMode = 0; // 0 = SIM, 1 = WIFI
-    bool isMuted = false;        // true = ปิดเสียง (Mute), false = เปิดเสียง
+    uint8_t networkMode = 0;        // 0 = SIM, 1 = WIFI
+    bool isMuted = false;           // true = ปิดเสียง (Mute), false = เปิดเสียง
 };
 class NVSManager {
 public:
@@ -40,7 +36,11 @@ public:
     static void reset();
 
     // ข้อมูลที่ Task อื่นเข้าถึงได้โดยตรง
-    static CalibData  calib;
+    static CalibData calibEC;
+#if SENSOR_COUNT == 3
+    static CalibData calibPH;
+    static CalibData calibDO;
+#endif
     static ThreshData thresh;
     static SystemConfig config;
 
@@ -49,14 +49,20 @@ private:
     static const char* NAMESPACE;  // "salinity"
 
     // Key names รวมไว้ที่เดียว ป้องกันพิมพ์ผิด
-    static const char* KEY_V_DI;
-    static const char* KEY_V_SALT;
-    static const char* KEY_T_SALT;
+    static const char* KEY_EC_A;
+    static const char* KEY_EC_B;
+
+#if SENSOR_COUNT == 3
+    static const char* KEY_PH_A;
+    static const char* KEY_PH_B;
+    static const char* KEY_DO_A;
+    static const char* KEY_DO_B;
+#endif
+
+    // Keys สำหรับ Threshold และ Config
     static const char* KEY_THRESH_G;
     static const char* KEY_THRESH_Y;
     static const char* KEY_THRESH_R;
-    static const char* KEY_ALPHA;
-    static const char* KEY_BETA;
     static const char* KEY_NET_MODE;
     static const char* KEY_IS_MUTED;
 };

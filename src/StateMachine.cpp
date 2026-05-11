@@ -303,13 +303,13 @@ void StateMachine::_handleEditCalManual(ButtonEvent ev) {
         float step = (ev == ButtonEvent::ROTATE_CW) ? 0.001f : -0.001f;
 
         if (editingColor == 'A') {
-            NVSManager::calib.alpha += step;
+            NVSManager::calibEC.alpha += step;
             // ป้องกัน Alpha ติดลบหรือเป็นศูนย์ (เดี๋ยวเอาไปคูณแล้วค่าน้ำหายหมด)
-            if (NVSManager::calib.alpha < 0.001f) {
-                NVSManager::calib.alpha = 0.001f;
+            if (NVSManager::calibEC.alpha < 0.001f) {
+                NVSManager::calibEC.alpha = 0.001f;
             }
         } else if (editingColor == 'B') {
-            NVSManager::calib.beta += step;
+            NVSManager::calibEC.beta += step;
         }
     } 
     else if (ev == ButtonEvent::SHORT_PRESS) {
@@ -341,9 +341,9 @@ bool StateMachine::_captureStableValue(float &capturedVolt, float &capturedTemp)
     for (int i = 0; i < N; i++) {
         SensorData s;
         xQueuePeek(sensorQueue, &s, 0); // ดึงค่าล่าสุดจาก SensorTask
-        bufVolt[i] = s.currentVolt;
-        sumVolt += s.currentVolt;
-        sumTemp += s.currentTemp;
+        bufVolt[i] = s.voltEC;
+        sumVolt += s.voltEC;
+        sumTemp += s.tempC;
         
         vTaskDelay(pdMS_TO_TICKS(500)); // หน่วงเวลาดึงค่าทีละ 0.5 วินาที
     }
@@ -404,11 +404,8 @@ void StateMachine::_handleCalFinish() {
     if (SensorMath::computeAlphaBeta(tmp_v_di, tmp_t_di, tmp_v_salt, tmp_t_salt, newAlpha, newBeta)) {
         
         // ถ้าคำนวณสำเร็จ ให้เซฟทุกอย่างลง NVS (หรือ EEPROM ของคุณ)
-        NVSManager::calib.v_di   = tmp_v_di;
-        NVSManager::calib.v_salt = tmp_v_salt;
-        NVSManager::calib.t_salt = tmp_t_salt;
-        NVSManager::calib.alpha  = newAlpha;
-        NVSManager::calib.beta   = newBeta; 
+        NVSManager::calibEC.alpha  = newAlpha;
+        NVSManager::calibEC.beta   = newBeta; 
         NVSManager::saveCalib();
 
         

@@ -88,17 +88,17 @@ void ScreenManager::_drawStartup() {
 void ScreenManager::_drawMainScreen() {
     _lcd.setCursor(0, 0);
     _lcd.print("SAL : ");
-    _printPadded(_sensor.currentPPT, 2, 5); 
+    _printPadded(_sensor.valPPT, 2, 5); 
     _lcd.print(" ppt     "); // เคาะสเปซบาร์ด้านหลัง 5 ที
 
     _lcd.setCursor(0, 1);
     _lcd.print("EC  : ");
-    _printPadded(_sensor.currentEC, 2, 5); 
+    _printPadded(_sensor.valEC, 2, 5); 
     _lcd.print(" mS/cm   "); // เคาะสเปซบาร์ด้านหลัง 3 ที
 
     _lcd.setCursor(0, 2);
     _lcd.print("Temp: ");
-    _printPadded(_sensor.currentTemp, 1, 5);
+    _printPadded(_sensor.tempC, 1, 5);
     _lcd.print(" ");
     _lcd.print((char)223); // สัญลักษณ์องศา (°)
     _lcd.print("C      "); // เคาะสเปซบาร์ด้านหลัง 6 ที
@@ -194,15 +194,15 @@ void ScreenManager::_drawReadTemp() {
     _lcd.print("--- Temperature --- ");
     _lcd.setCursor(0, 1);
     _lcd.print("Celsius : ");
-    _printPadded(_sensor.currentTemp, 2, 6);
+    _printPadded(_sensor.tempC, 2, 6);
     _lcd.print(" C");
     _lcd.setCursor(0, 2);
     _lcd.print("Fahren  : ");
-    _printPadded((_sensor.currentTemp * 9.0f / 5.0f) + 32.0f, 2, 6);
+    _printPadded((_sensor.tempC * 9.0f / 5.0f) + 32.0f, 2, 6);
     _lcd.print(" F");
     _lcd.setCursor(0, 3);
     _lcd.print("Kelvin  : ");
-    _printPadded(_sensor.currentTemp + 273.15f, 2, 6);
+    _printPadded(_sensor.tempC + 273.15f, 2, 6);
     _lcd.print(" K");
 }
 
@@ -365,12 +365,12 @@ void ScreenManager::_drawCalmanual() {
     _lcd.setCursor(0, 0);
     _lcd.print(idx == 0 ? "> " : "  ");
     _lcd.print("Alpha : ");
-    _printPadded(NVSManager::calib.alpha, 3, 5);
+    _printPadded(NVSManager::calibEC.alpha, 3, 5);
 
     _lcd.setCursor(0, 1);
     _lcd.print(idx == 1 ? "> " : "  ");
     _lcd.print("Beta  : ");
-    _printPadded(NVSManager::calib.beta, 3, 5);
+    _printPadded(NVSManager::calibEC.beta, 3, 5);
 
     _lcd.setCursor(0, 2);
     _lcd.print(idx == 2 ? "> Save And SendTime" : "  Save And SendTime");
@@ -388,7 +388,7 @@ void ScreenManager::_drawEditCalManual() {
     }
 
     _lcd.setCursor(0, 2);
-    float val = (_sm.editingColor == 'A') ? NVSManager::calib.alpha : NVSManager::calib.beta;
+    float val = (_sm.editingColor == 'A') ? NVSManager::calibEC.alpha : NVSManager::calibEC.beta;
     _lcd.print("      [");
     _printPadded(val, 3, 6);
     _lcd.print("]     ");
@@ -404,7 +404,7 @@ void ScreenManager::_drawCalDI() {
     _lcd.setCursor(0, 1);
     _lcd.print("Target: 1.413 us/cm ");
     _lcd.setCursor(0, 2);
-    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.currentVolt, _sensor.currentTemp);
+    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.voltEC, _sensor.tempC);
     _lcd.print(buf);
     _lcd.setCursor(0, 3);
     _lcd.print("Click to Cancel     ");
@@ -417,7 +417,7 @@ void ScreenManager::_drawCalSalt() {
     _lcd.setCursor(0, 1);
     _lcd.print("Target: 12.88 ms/cm ");
     _lcd.setCursor(0, 2);
-    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.currentVolt, _sensor.currentTemp);
+    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.voltEC, _sensor.tempC);
     _lcd.print(buf);
     _lcd.setCursor(0, 3);
     _lcd.print("Click to Cancel     ");

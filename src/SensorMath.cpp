@@ -11,8 +11,8 @@ float SensorMath::calcEC25(float volt, float tempC) {
 }
 
 bool SensorMath::computeAlphaBeta(float v_di, float t_di, 
-                                   float v_salt, float t_salt, 
-                                   float &alphaOut, float &betaOut) {
+                                float v_salt, float t_salt, 
+                                float &alphaOut, float &betaOut) {
     float ec25_di   = calcEC25(v_di, t_di);
     float ec25_salt = calcEC25(v_salt, t_salt);
 

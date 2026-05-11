@@ -140,8 +140,8 @@ void WifiTask::taskEntry(void* param) {
 String WifiTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonDocument doc;
     doc["id"]       = DEVICE_ID;
-    doc["salinity"] = serialized(String(sensor.currentPPT,  2));
-    doc["temp"]     = serialized(String(sensor.currentTemp, 1));
+    doc["salinity"] = serialized(String(sensor.valPPT,  2));
+    doc["temp"]     = serialized(String(sensor.tempC, 1));
 
     JsonObject address = doc["address"].to<JsonObject>();
     address["x"] = String(gps.lat, 6);

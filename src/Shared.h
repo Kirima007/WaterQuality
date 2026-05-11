@@ -4,11 +4,24 @@
 #include <freertos/queue.h>
 
 struct SensorData {
-    float currentTemp; // อุณหภูมิ °C
-    float currentVolt; // แรงดันจาก ADS1115
-    float currentPPT; // PPT
-    float currentEC;
-    long int timestamp; 
+    uint32_t timestamp;
+    float tempC;      // อุณหภูมิน้ำ
+    bool  tempValid;  // อ่านอุณหภูมิสำเร็จไหม
+
+    // --- เซ็นเซอร์ 1: ความเค็ม ---
+    float voltEC;     // ค่าแรงดันดิบ
+    float valEC;      // ค่า EC (mS/cm)
+    float valPPT;     // ค่าความเค็ม (ppt)
+
+#if SENSOR_COUNT == 3
+    // --- เซ็นเซอร์ 2: pH ---
+    float voltPH;
+    float valPH;      // ค่า pH (0-14)
+
+    // --- เซ็นเซอร์ 3: DO ---
+    float voltDO;
+    float valDO;      // ค่า DO (mg/L)
+#endif
 };
 
 struct GPSData {

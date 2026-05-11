@@ -3,19 +3,28 @@
 // ==========================================
 // Static Member Definitions
 // ==========================================
-CalibData  NVSManager::calib;
+CalibData  NVSManager::calibEC;
+#if SENSOR_COUNT == 3
+CalibData  NVSManager::calibPH;
+CalibData  NVSManager::calibDO;
+#endif
 ThreshData NVSManager::thresh;
 Preferences NVSManager::_prefs;
 SystemConfig NVSManager::config;
 
 // Key names รวมไว้ที่เดียว
 // ถ้าอยากเปลี่ยน key แก้ที่นี่ที่เดียวพอ
-const char* NVSManager::NAMESPACE    = "salinity";
-const char* NVSManager::KEY_V_DI     = "v_di";
-const char* NVSManager::KEY_V_SALT   = "v_salt";
-const char* NVSManager::KEY_T_SALT   = "t_salt";
-const char* NVSManager::KEY_ALPHA    = "alpha";   // ← เพิ่ม
-const char* NVSManager::KEY_BETA     = "beta";    // ← เพิ่ม
+const char* NVSManager::NAMESPACE    = "sys_data";
+const char* NVSManager::KEY_EC_A     = "ec_a";
+const char* NVSManager::KEY_EC_B     = "ec_b";
+
+#if SENSOR_COUNT == 3
+const char* NVSManager::KEY_PH_A     = "ph_a";
+const char* NVSManager::KEY_PH_B     = "ph_b";
+const char* NVSManager::KEY_DO_A     = "do_a";
+const char* NVSManager::KEY_DO_B     = "do_b";
+#endif
+
 const char* NVSManager::KEY_THRESH_G = "th_g";
 const char* NVSManager::KEY_THRESH_Y = "th_y";
 const char* NVSManager::KEY_THRESH_R = "th_r";
@@ -28,14 +37,20 @@ const char* NVSManager::KEY_IS_MUTED  = "is_muted"; // ← เพิ่ม
 // Load — เรียกครั้งเดียวตอน boot
 // ==========================================
 void NVSManager::load() {
-    _prefs.begin(NAMESPACE, false);  // false = read/write mode
+    _prefs.begin(NAMESPACE, true); // true = Read Only
 
-    // โหลด Calibration (ถ้าไม่มีใน Flash ใช้ค่า default)
-    calib.v_di   = _prefs.getFloat(KEY_V_DI,    calib.v_di);
-    calib.v_salt = _prefs.getFloat(KEY_V_SALT,   calib.v_salt);
-    calib.t_salt = _prefs.getFloat(KEY_T_SALT,   calib.t_salt);
-    calib.alpha  = _prefs.getFloat(KEY_ALPHA,    calib.alpha);  // ← เพิ่ม
-    calib.beta   = _prefs.getFloat(KEY_BETA,     calib.beta);   // ← เพิ่ม
+    // 1. โหลดค่า EC (ใช้ตัวเลขบนหัวโพรบ 0.99x เป็นค่า Default ได้เลย)
+    calibEC.alpha = _prefs.getFloat(KEY_EC_A, 1.0f); 
+    calibEC.beta  = _prefs.getFloat(KEY_EC_B, 0.0f);
+
+#if SENSOR_COUNT == 3
+    // 2. โหลดค่า pH และ DO (Default alpha = 1.0)
+    calibPH.alpha = _prefs.getFloat(KEY_PH_A, 1.0f);
+    calibPH.beta  = _prefs.getFloat(KEY_PH_B, 0.0f);
+
+    calibDO.alpha = _prefs.getFloat(KEY_DO_A, 1.0f);
+    calibDO.beta  = _prefs.getFloat(KEY_DO_B, 0.0f);
+#endif
 
 
     // โหลด Threshold
@@ -54,12 +69,18 @@ void NVSManager::load() {
 // Save Calibration
 // ==========================================
 void NVSManager::saveCalib() {
-    _prefs.begin(NAMESPACE, false);
-    _prefs.putFloat(KEY_V_DI,   calib.v_di);
-    _prefs.putFloat(KEY_V_SALT, calib.v_salt);
-    _prefs.putFloat(KEY_T_SALT, calib.t_salt);
-    _prefs.putFloat(KEY_ALPHA,  calib.alpha);  // ← เพิ่ม
-    _prefs.putFloat(KEY_BETA,   calib.beta);   // ← เพิ่ม
+    _prefs.begin(NAMESPACE, false); // false = Read/Write
+
+    _prefs.putFloat(KEY_EC_A, calibEC.alpha);
+    _prefs.putFloat(KEY_EC_B, calibEC.beta);
+
+#if SENSOR_COUNT == 3
+    _prefs.putFloat(KEY_PH_A, calibPH.alpha);
+    _prefs.putFloat(KEY_PH_B, calibPH.beta);
+    
+    _prefs.putFloat(KEY_DO_A, calibDO.alpha);
+    _prefs.putFloat(KEY_DO_B, calibDO.beta);
+#endif
 
     _prefs.end();
 }
@@ -90,8 +111,14 @@ void NVSManager::saveConfig() {
 // ==========================================
 void NVSManager::reset() {
     // คืนค่า struct กลับ default
-    calib  = CalibData{};
+    calibEC = CalibData{};
+#if SENSOR_COUNT == 3
+    calibPH = CalibData{};
+    calibDO = CalibData{};
+#endif
+
     thresh = ThreshData{};
+    config = SystemConfig{}; // <-- เผื่ออยากให้ networkMode กลับเป็น 0 ด้วย
 
     // ลบทุกค่าใน namespace นี้ออกจาก Flash
     _prefs.begin(NAMESPACE, false);

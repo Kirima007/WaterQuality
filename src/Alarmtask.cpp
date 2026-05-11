@@ -55,7 +55,7 @@ void AlarmTask::taskEntry(void* param) {
         // ดึงค่าล่าสุด
         if (xQueuePeek(sensorQueue, &sensor, 0) == pdTRUE) {
             
-            float ppt   = sensor.currentPPT;
+            float ppt   = sensor.valPPT;
             float thG   = NVSManager::thresh.green;
             float thY   = NVSManager::thresh.yellow;
             float thR   = NVSManager::thresh.red;
