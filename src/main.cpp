@@ -6,12 +6,12 @@
 #include "NVSManager.h"
 #include "SoundManager.h"
 #include "Rotary.h"
-#include "Sensor.h"
+#include "SensorTask.h"
 #include "GPS.h"
 #include "StateMachine.h"
 #include "ScreenManager.h"
 #include "AlarmTask.h"
-#include "Sim.h"
+#include "SimTask.h"
 #include "WifiTask.h"
 
 // ==========================================

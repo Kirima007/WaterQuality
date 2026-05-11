@@ -1,7 +1,7 @@
 #define TINY_GSM_MODEM_SIM800
 #define simSerial Serial1
 
-#include "Sim.h"
+#include "SimTask.h"
 #include "StateMachine.h"
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>

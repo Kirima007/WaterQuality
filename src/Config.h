@@ -27,7 +27,7 @@
 #define HTTP_PORT       80                // พอร์ต
 #define HTTP_PATH       "/api/data"     // endpoint
 #define HTTP_PATH_CALIB "/api/calibrate/salinity"
-#define DEVICE_ID       4           
+#define DEVICE_ID       99           
 #define FW_VERSION  "V1.1"     // Version ของเฟิร์มแวร์
 
 

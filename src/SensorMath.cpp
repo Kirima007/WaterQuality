@@ -1,18 +1,18 @@
-#include "SalinityCalc.h"
+#include "SensorMath.h"
 
 // ==========================================
 // Constants
 // ==========================================
-// const float SalinityCalc::TARGET_PPT = 6.35f;
+// const float SensorMath::TARGET_PPT = 6.35f;
 
-float SalinityCalc::calcEC25(float volt, float tempC) {
+float SensorMath::calcEC25(float volt, float tempC) {
     float ecBase = (19.47f * volt) - 0.008f;
     return ecBase / (1.0f + 0.01702f * (tempC - 25.0f));
 }
 
-bool SalinityCalc::computeAlphaBeta(float v_di, float t_di, 
-                                    float v_salt, float t_salt, 
-                                    float &alphaOut, float &betaOut) {
+bool SensorMath::computeAlphaBeta(float v_di, float t_di, 
+                                   float v_salt, float t_salt, 
+                                   float &alphaOut, float &betaOut) {
     float ec25_di   = calcEC25(v_di, t_di);
     float ec25_salt = calcEC25(v_salt, t_salt);
 
@@ -28,7 +28,7 @@ bool SalinityCalc::computeAlphaBeta(float v_di, float t_di,
     return true;
 }
 
-float SalinityCalc::calculate(float volt, float tempC, float alpha, float beta) {
+float SensorMath::calculate(float volt, float tempC, float alpha, float beta) {
     float ecFinal = calculateEC(volt, tempC, alpha, beta);
     
     if (ecFinal <= 0.0f) {//กรองกรณี EC ติดลบหรือเป็นศูนย์ (ซึ่งไม่สมเหตุสมผล) ให้คืนค่า Salinity เป็น 0.0 ppt แทน
@@ -40,7 +40,7 @@ float SalinityCalc::calculate(float volt, float tempC, float alpha, float beta) 
     return max(0.0f, salinity);
 }
 
-float SalinityCalc::calculateEC(float volt, float tempC, float alpha, float beta) {
+float SensorMath::calculateEC(float volt, float tempC, float alpha, float beta) {
     float ec25_current = calcEC25(volt, tempC);
     float ecFinal = (alpha * ec25_current) + beta;
     return max(0.0f, ecFinal);

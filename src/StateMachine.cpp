@@ -1,6 +1,6 @@
 #include "StateMachine.h"
-#include "SalinityCalc.h"
-#include "Sim.h"
+#include "SensorMath.h"
+#include "SimTask.h"
 // ==========================================
 // Constructor
 // ==========================================
@@ -401,7 +401,7 @@ void StateMachine::_handleCalFinish() {
     float newAlpha, newBeta;
     bool isSuccess = false;
     // คำนวณหา Alpha/Beta จากค่าน้ำ DI และ Salt ที่เพิ่งจดจำมา
-    if (SalinityCalc::computeAlphaBeta(tmp_v_di, tmp_t_di, tmp_v_salt, tmp_t_salt, newAlpha, newBeta)) {
+    if (SensorMath::computeAlphaBeta(tmp_v_di, tmp_t_di, tmp_v_salt, tmp_t_salt, newAlpha, newBeta)) {
         
         // ถ้าคำนวณสำเร็จ ให้เซฟทุกอย่างลง NVS (หรือ EEPROM ของคุณ)
         NVSManager::calib.v_di   = tmp_v_di;

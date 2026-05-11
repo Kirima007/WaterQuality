@@ -1,5 +1,5 @@
-#include "Sensor.h"
-#include "SalinityCalc.h"
+#include "SensorTask.h"
+#include "SensorMath.h"
 #include "NVSManager.h"
 #include "config.h"
 #include <Adafruit_ADS1X15.h>
@@ -70,15 +70,15 @@ void SensorTask::taskEntry(void* param) {
         int16_t rawAvg    = readADSAvg(ads, 0, 10);
         data.currentVolt  = ads.computeVolts(rawAvg);
 
-        // ดึงค่า calibration จาก NVSManager มาเข้าสมการของ SalinityCalc
+        // ดึงค่า calibration จาก NVSManager มาเข้าสมการของ SensorMath
 
-        data.currentEC = SalinityCalc::calculateEC(
+        data.currentEC = SensorMath::calculateEC(
             data.currentVolt,
             data.currentTemp,
             NVSManager::calib.alpha,
             NVSManager::calib.beta
         );
-        data.currentPPT = SalinityCalc::calculate(
+        data.currentPPT = SensorMath::calculate(
             data.currentVolt,
             data.currentTemp,
             NVSManager::calib.alpha,

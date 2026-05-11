@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-class SalinityCalc {
+class SensorMath {
 public:
     static const float TARGET_PPT;
 
