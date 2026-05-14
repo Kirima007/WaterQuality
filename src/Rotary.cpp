@@ -11,6 +11,7 @@ RotaryInput::RotaryInput(uint8_t pinCLK, uint8_t pinDT, uint8_t pinSW) {
     _lastEncoderCount  = 0;
     _isButtonDown      = false;
     _longPressTriggered = false;
+    _superLongPressTriggered = false;
     _buttonDownTime    = 0;
 }
 
@@ -76,14 +77,21 @@ void RotaryInput::_handleButton() {
     if (isPressed && !_isButtonDown) {
         _isButtonDown       = true;
         _longPressTriggered = false;
+        _superLongPressTriggered = false;
         _buttonDownTime     = millis();
     }
 
-    // --- ระหว่างกดค้าง: เช็ค Long Press ---
-    if (isPressed && _isButtonDown && !_longPressTriggered) {
-        if (millis() - _buttonDownTime > ROTARY_LONG_PRESS_MS) {
+    // --- ระหว่างกดค้าง: เช็ค Long Press & Super Long Press ---
+    if (isPressed && _isButtonDown) {
+        unsigned long pressTime = millis() - _buttonDownTime;
+        
+        if (!_superLongPressTriggered && pressTime > ROTARY_SUPER_LONG_PRESS_MS) {
+            _superLongPressTriggered = true;
+            ButtonEvent ev = ButtonEvent::SUPER_LONG_PRESS;
+            xQueueSend(inputQueue, &ev, 0);
+        }
+        else if (!_longPressTriggered && pressTime > ROTARY_LONG_PRESS_MS) {
             _longPressTriggered = true;
-
             ButtonEvent ev = ButtonEvent::LONG_PRESS;
             xQueueSend(inputQueue, &ev, 0);
         }

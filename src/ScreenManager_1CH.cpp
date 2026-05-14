@@ -1,6 +1,8 @@
 #include "ScreenManager.h"
 #include "SimTask.h"
 
+#if SENSOR_COUNT == 1
+
 // ==========================================
 // Constructor
 // ==========================================
@@ -42,16 +44,15 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::SYSTEM_INFO:          self->_drawSystemInfo();        break;
             case AppState::CAL_MANUAL:           self->_drawCalmanual();         break;
             case AppState::EDIT_CAL_MANUAL:      self->_drawEditCalManual();     break;
-            case AppState::CAL_DI:               self->_drawCalDI();             break;
-            case AppState::CAL_SALT:             self->_drawCalSalt();           break;
+            case AppState::CAL_DI:               self->_drawCal1();             break;
+            case AppState::CAL_SALT:             self->_drawCal2();           break;
             case AppState::CAL_FINISH:           self->_drawCalFinish();         break;
             case AppState::CAL_CANCEL_CONFIRM:   self->_drawCalCancelConfirm();  break;
             // case AppState::SIM_STATUS:          self->_drawSimStatus();        break;
             case AppState::SIM_SENDING:         self->_drawSimSending();       break;
             case AppState::SIM_RESULT:          self->_drawSimResult();        break;
-            case AppState::NETWORK_MENU:        self->_drawNetworkMenu();  break;
             case AppState::NETWORK_STATUS:      self->_drawNetworkStatus();  break;
-            case AppState::BUZZER_MENU:         self->_drawBuzzerMenu();  break;
+            case AppState::SYSTEM_SETUP:        self->_drawSystemSetup();  break;
         }
 
         vTaskDelay(pdMS_TO_TICKS(DISPLAY_TASK_DELAY_MS));
@@ -88,20 +89,32 @@ void ScreenManager::_drawStartup() {
 void ScreenManager::_drawMainScreen() {
     _lcd.setCursor(0, 0);
     _lcd.print("SAL : ");
-    _printPadded(_sensor.valPPT, 2, 5); 
-    _lcd.print(" ppt     "); // เคาะสเปซบาร์ด้านหลัง 5 ที
+    if (_sensor.adsValid) {
+        _printPadded(_sensor.valPPT, 2, 5); 
+        _lcd.print(" ppt     ");
+    } else {
+        _lcd.print("ERR       ");
+    }
 
     _lcd.setCursor(0, 1);
     _lcd.print("EC  : ");
-    _printPadded(_sensor.valEC, 2, 5); 
-    _lcd.print(" mS/cm   "); // เคาะสเปซบาร์ด้านหลัง 3 ที
+    if (_sensor.adsValid) {
+        _printPadded(_sensor.valEC, 2, 5); 
+        _lcd.print(" mS/cm   ");
+    } else {
+        _lcd.print("ERR       ");
+    }
 
     _lcd.setCursor(0, 2);
     _lcd.print("Temp: ");
-    _printPadded(_sensor.tempC, 1, 5);
-    _lcd.print(" ");
-    _lcd.print((char)223); // สัญลักษณ์องศา (°)
-    _lcd.print("C      "); // เคาะสเปซบาร์ด้านหลัง 6 ที
+    if (_sensor.tempValid) {
+        _printPadded(_sensor.tempC, 1, 5);
+        _lcd.print(" ");
+        _lcd.print((char)223); // สัญลักษณ์องศา (°)
+        _lcd.print("C      ");
+    } else {
+        _lcd.print("ERR       ");
+    }
     String netPrefix;
     String netStatus;
     
@@ -122,7 +135,9 @@ void ScreenManager::_drawMainScreen() {
     }
 
     String gpsStatus;
-    if (_gps.valid) {
+    if (_gps.serialError) {
+        gpsStatus = "SER_ERR";
+    } else if (_gps.valid) {
         gpsStatus = "Fix " + String(_gps.satellites);
     } else {
         gpsStatus = "Wait";
@@ -137,15 +152,14 @@ void ScreenManager::_drawMainScreen() {
 }
 
 void ScreenManager::_drawMainMenu() {
-    const int totalItems = 9; // จำนวนเมนูทั้งหมด
+    const int totalItems = 8; // จำนวนเมนูทั้งหมด
     const char* items[totalItems] = {
         "Read Temp",
         "Network Status", 
-        "Network Mode", 
+        "Setting", 
         "Read GPS",
         "LED Threshold", 
         "Calibrate Mode", 
-        "Buzzer Enable", 
         "System Info", 
         "Back"
     };
@@ -206,23 +220,23 @@ void ScreenManager::_drawReadTemp() {
     _lcd.print(" K");
 }
 
-void ScreenManager::_drawNetworkMenu() {
+void ScreenManager::_drawSystemSetup() {
     _lcd.setCursor(0, 0);
-    _lcd.print("--- Network Mode ---"); 
+    _lcd.print("----- SETTING ------"); 
 
     _lcd.setCursor(0, 1);
-    // เว้นช่องว่างให้พอดี 20 ตัวอักษรเพื่อล้างจอไปในตัว
-    if (NVSManager::config.networkMode == NET_MODE_SIM) {
-        _lcd.print("  Select : [ SIM ]  "); 
-    } else {
-        _lcd.print("  Select : [ WIFI]  ");
-    }
+    _lcd.print(_sm.menuIndex == 0 ? "> " : "  ");
+    _lcd.print("Buzzer   : [");
+    _lcd.print(NVSManager::config.isMuted ? "OFF]  " : "ON ]  ");
 
     _lcd.setCursor(0, 2);
-    _lcd.print("                    "); // บรรทัดว่าง
+    _lcd.print(_sm.menuIndex == 1 ? "> " : "  ");
+    _lcd.print("Net Mode : [");
+    _lcd.print(NVSManager::config.networkMode == NET_MODE_SIM ? "SIM]  " : "WIFI] ");
 
     _lcd.setCursor(0, 3);
-    _lcd.print("   Click to Save    ");
+    _lcd.print(_sm.menuIndex == 2 ? "> " : "  ");
+    _lcd.print("Back              ");
 }
 
 // ==========================================
@@ -334,7 +348,7 @@ void ScreenManager::_drawCalMenu() {
 
 
 // ==========================================
-// SYSTEM_INFO
+// SYSTEM_INFO5
 // ==========================================
 void ScreenManager::_drawSystemInfo() {
     char buf[21];
@@ -366,14 +380,19 @@ void ScreenManager::_drawCalmanual() {
     _lcd.print(idx == 0 ? "> " : "  ");
     _lcd.print("Alpha : ");
     _printPadded(NVSManager::calibEC.alpha, 3, 5);
+    _lcd.print("     ");
 
     _lcd.setCursor(0, 1);
     _lcd.print(idx == 1 ? "> " : "  ");
     _lcd.print("Beta  : ");
     _printPadded(NVSManager::calibEC.beta, 3, 5);
+    _lcd.print("     ");
 
     _lcd.setCursor(0, 2);
-    _lcd.print(idx == 2 ? "> Save And SendTime" : "  Save And SendTime");
+    _lcd.print(idx == 2 ? "> Save And Send     " : "  Save And Send     ");
+
+    _lcd.setCursor(0, 3);
+    _lcd.print(idx == 3 ? "> Cancel            " : "  Cancel            ");
 }
 
 void ScreenManager::_drawEditCalManual() {
@@ -397,7 +416,7 @@ void ScreenManager::_drawEditCalManual() {
     _lcd.print("  Click to Confirm  ");
 }
 
-void ScreenManager::_drawCalDI() {
+void ScreenManager::_drawCal1() {
     char buf[21];
     _lcd.setCursor(0, 0);
     _lcd.print("1. Insert Water     "); 
@@ -410,10 +429,10 @@ void ScreenManager::_drawCalDI() {
     _lcd.print("Click to Cancel     ");
 }
 
-void ScreenManager::_drawCalSalt() {
+void ScreenManager::_drawCal2() {
     char buf[21];
     _lcd.setCursor(0, 0);
-    _lcd.print("1. Insert Water     "); 
+    _lcd.print("2. Insert Water     "); 
     _lcd.setCursor(0, 1);
     _lcd.print("Target: 12.88 ms/cm ");
     _lcd.setCursor(0, 2);
@@ -490,7 +509,6 @@ void ScreenManager::_drawCalCancelConfirm() {
 //     _lcd.print("C  ");
 // }
 
-
 void ScreenManager::_drawSimSending() {
     _lcd.setCursor(0, 0); _lcd.print("--- Sending... ---  ");
     _lcd.setCursor(0, 1); _lcd.print(" Uploading data...  ");
@@ -565,27 +583,4 @@ void ScreenManager::_drawNetworkStatus() {
     }
 }
 
-// ==========================================
-// BUZZER_MENU
-// ==========================================
-void ScreenManager::_drawBuzzerMenu() {
-    _lcd.setCursor(0, 0);
-    _lcd.print("--- Buzzer Mode ----"); 
-
-    _lcd.setCursor(0, 1);
-    
-    // ตรวจสอบค่า Mute จาก Config
-    // isMuted = true แปลว่า "ปิดเสียง"
-    // isMuted = false แปลว่า "เปิดเสียง"
-    if (!NVSManager::config.isMuted) {
-        _lcd.print("  Select : [ ON ]   "); 
-    } else {
-        _lcd.print("  Select : [ OFF]   ");
-    }
-
-    _lcd.setCursor(0, 2);
-    _lcd.print("                    "); // เคลียร์หน้าจอบรรทัดนี้
-
-    _lcd.setCursor(0, 3);
-    _lcd.print("   Click to Save    ");
-}
+#endif

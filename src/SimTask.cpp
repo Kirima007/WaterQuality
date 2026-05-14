@@ -13,12 +13,20 @@
 volatile bool SimTask::_connected          = false;
 volatile bool SimTask::_sendRequested      = false;
 volatile bool SimTask::_sendCalibRequested = false;
+volatile uint8_t SimTask::_reqSensorIdx    = 0;
+volatile uint8_t SimTask::_reqCalibIdx     = 0;
 volatile int  SimTask::_signalQuality      = 0;
 
 bool SimTask::isConnected()      { return _connected; }
 int  SimTask::getSignalQuality() { return _signalQuality; }
-void SimTask::requestSend()      { _sendRequested      = true; }
-void SimTask::requestSendCalib() { _sendCalibRequested = true; }
+void SimTask::requestSend(uint8_t sensorIndex) { 
+    _reqSensorIdx = sensorIndex;
+    _sendRequested = true; 
+}
+void SimTask::requestSendCalib(uint8_t sensorIndex) { 
+    _reqCalibIdx = sensorIndex;
+    _sendCalibRequested = true; 
+}
 
 TinyGsm       modem(simSerial);
 TinyGsmClient gsmClient(modem);
@@ -152,10 +160,8 @@ void SimTask::taskEntry(void* param) {
                     // 🚨 กฎเหล็ก: ถ้า GPS ไม่ติด ยกเลิกการส่งทันที!
                     if (!gps.valid) {
                         Serial.println("[SIM800L] Abort sending: GPS no fix!");
-                        // แจ้ง StateMachine ว่าส่ง Fail (ใช้ -2 เพื่อบอกว่าเป็นเพราะ GPS ไม่ติด)
                         sm->onSimSendComplete(false, -2); 
                     } else {
-                        // ถ้า GPS ติด ค่อยแพ็ก JSON แล้วส่ง
                         String payload = _buildJson(sensor, gps);
                         _doPost(HTTP_PATH, payload, sm, false);
                     }
@@ -165,7 +171,7 @@ void SimTask::taskEntry(void* param) {
             }
         }
 
-        // รอบ 3: ส่ง Calibration Data (ปกติ Calib ไม่จำเป็นต้องบังคับมี GPS ก็ได้)
+        // รอบ 3: ส่ง Calibration Data
         if (_sendCalibRequested) {
             _sendCalibRequested = false;
 
@@ -173,7 +179,11 @@ void SimTask::taskEntry(void* param) {
                 sm->onSimSendComplete(false, 0);
             } else {
                 String payload = _buildCalibJson();
-                _doPost(HTTP_PATH_CALIB, payload, sm, true);
+                String path = HTTP_PATH_CALIB_SALINITY;
+                if (_reqCalibIdx == 1) path = HTTP_PATH_CALIB_PH;
+                else if (_reqCalibIdx == 2) path = HTTP_PATH_CALIB_O2;
+                
+                _doPost(path, payload, sm, true);
             }
         }
 
@@ -187,10 +197,19 @@ void SimTask::taskEntry(void* param) {
 String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonDocument doc;
     doc["id"]       = DEVICE_ID;
-    doc["salinity"] = serialized(String(sensor.valPPT,  2));
     doc["temp"]     = serialized(String(sensor.tempC, 1));
 
-    // เนื่องจากเรากรอง gps.valid ไปแล้วก่อนส่ง ตรงนี้จะมีค่าเสมอ
+    if (_reqSensorIdx == 0) {
+        doc["salinity"] = serialized(String(sensor.valPPT, 2));
+    } 
+#if SENSOR_COUNT == 3
+    else if (_reqSensorIdx == 1) {
+        doc["ph"] = serialized(String(sensor.valPH, 2));
+    } else if (_reqSensorIdx == 2) {
+        doc["o2"] = serialized(String(sensor.valDO, 2));
+    }
+#endif
+
     JsonObject address = doc["address"].to<JsonObject>();
     address["x"] = String(gps.lat, 6);
     address["y"] = String(gps.lng, 6);
@@ -206,7 +225,6 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
 String SimTask::_buildCalibJson() {
     JsonDocument doc;
     doc["id"]     = DEVICE_ID;
-
     String payload;
     serializeJson(doc, payload);
     return payload;

@@ -12,12 +12,20 @@
 volatile bool WifiTask::_connected          = false;
 volatile bool WifiTask::_sendRequested      = false;
 volatile bool WifiTask::_sendCalibRequested = false;
+volatile uint8_t WifiTask::_reqSensorIdx    = 0;
+volatile uint8_t WifiTask::_reqCalibIdx     = 0;
 volatile int  WifiTask::_signalQuality      = 0;
 
 bool WifiTask::isConnected()      { return _connected; }
 int  WifiTask::getSignalQuality() { return _signalQuality; }
-void WifiTask::requestSend()      { _sendRequested      = true; }
-void WifiTask::requestSendCalib() { _sendCalibRequested = true; }
+void WifiTask::requestSend(uint8_t sensorIndex) { 
+    _reqSensorIdx = sensorIndex;
+    _sendRequested = true; 
+}
+void WifiTask::requestSendCalib(uint8_t sensorIndex) { 
+    _reqCalibIdx = sensorIndex;
+    _sendCalibRequested = true; 
+}
 
 // ==========================================
 // Helper: ส่ง HTTP POST ผ่าน Wi-Fi
@@ -126,7 +134,11 @@ void WifiTask::taskEntry(void* param) {
                 sm->onSimSendComplete(false, 0);
             } else {
                 String payload = _buildCalibJson();
-                _doPost(HTTP_PATH_CALIB, payload, sm);
+                String path = HTTP_PATH_CALIB_SALINITY;
+                if (_reqCalibIdx == 1) path = HTTP_PATH_CALIB_PH;
+                else if (_reqCalibIdx == 2) path = HTTP_PATH_CALIB_O2;
+
+                _doPost(path, payload, sm);
             }
         }
 
@@ -140,8 +152,18 @@ void WifiTask::taskEntry(void* param) {
 String WifiTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonDocument doc;
     doc["id"]       = DEVICE_ID;
-    doc["salinity"] = serialized(String(sensor.valPPT,  2));
     doc["temp"]     = serialized(String(sensor.tempC, 1));
+
+    if (_reqSensorIdx == 0) {
+        doc["salinity"] = serialized(String(sensor.valPPT, 2));
+    } 
+#if SENSOR_COUNT == 3
+    else if (_reqSensorIdx == 1) {
+        doc["ph"] = serialized(String(sensor.valPH, 2));
+    } else if (_reqSensorIdx == 2) {
+        doc["o2"] = serialized(String(sensor.valDO, 2));
+    }
+#endif
 
     JsonObject address = doc["address"].to<JsonObject>();
     address["x"] = String(gps.lat, 6);
@@ -158,7 +180,6 @@ String WifiTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
 String WifiTask::_buildCalibJson() {
     JsonDocument doc;
     doc["id"]     = DEVICE_ID;
-
     String payload;
     serializeJson(doc, payload);
     return payload;

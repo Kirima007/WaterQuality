@@ -12,22 +12,28 @@ enum class AppState {
     MAIN_MENU,
     READ_TEMP,
     READ_GPS,
+
+#if SENSOR_COUNT == 3
+    // State หน้าจอคั่นกลาง สำหรับเมนู 3 หัว
+    MONITOR_MENU,
+    THRESH_PARAM_MENU,
+    CAL_PARAM_MENU,
+#endif
+
     THRESH_MENU,
     EDIT_THRESH,
-    CAL_MENU, // new
+    CAL_MENU, 
     SYSTEM_INFO,
-    CAL_MANUAL, // new
-    EDIT_CAL_MANUAL, // new
+    CAL_MANUAL, 
+    EDIT_CAL_MANUAL, 
     CAL_DI,
     CAL_SALT,
     CAL_FINISH,
     CAL_CANCEL_CONFIRM,
-    // SIM_STATUS,
     SIM_SENDING,
     SIM_RESULT,
     NETWORK_STATUS,
-    NETWORK_MENU, // new
-    BUZZER_MENU, // new
+    SYSTEM_SETUP,
 };
 
 class StateMachine {
@@ -46,7 +52,12 @@ public:
     // ข้อมูลที่ ScreenManager ต้องการ
     int  menuIndex      = 0;
     int  cancelSelect   = 1;   // 0=YES, 1=NO
-    char editingColor   = 'G'; // 'G' หรือ 'R'
+    char editingColor   = 'G'; // 'G' หรือ 'R' หรือ 'A', 'B' (สำหรับ Calibrate)
+
+#if SENSOR_COUNT == 3
+    // ตัวแปรจำว่ากำลังเลือกเซ็นเซอร์ตัวไหนอยู่ (0 = EC, 1 = pH, 2 = DO)
+    uint8_t currentParam = 0; 
+#endif
 
     // ค่า calibration ชั่วคราว (ก่อนกด confirm)
     float tmp_v_di   = 0.0f;
@@ -60,24 +71,23 @@ public:
     // SimTask เรียกเมื่อส่งเสร็จ
     void onSimSendComplete(bool success, int httpCode);
 
-
 private:
     AppState _current;
     AppState _prev;
+    AppState _returnState;   // จำไว้ว่าต้องกลับไปหน้าไหนหลังส่งเสร็จ
     AppState _lastCalState;  // จำไว้ว่าอยู่ขั้นไหนก่อน cancel
     bool     _changed;
 
     void _goTo(AppState next);
-
-    bool _captureStableValue(float &capturedVolt, float &capturedTemp);
-    // Handler แต่ละ State
+    
+    // Handler แต่ละ State (ใช้ร่วมกัน)
     void _handleMainScreen(ButtonEvent ev);
     void _handleMainMenu(ButtonEvent ev);
     void _handleReadTemp(ButtonEvent ev);
     void _handleReadGPS(ButtonEvent ev);
     void _handleThreshMenu(ButtonEvent ev);
     void _handleEditThresh(ButtonEvent ev);
-    void _handleCalMenu(ButtonEvent ev); // new
+    void _handleCalMenu(ButtonEvent ev); 
     void _handleSystemInfo(ButtonEvent ev);
     void _handleCalManual(ButtonEvent ev, const SensorData& sensor);
     void _handleEditCalManual(ButtonEvent ev);
@@ -88,7 +98,13 @@ private:
     void _handleSimStatus(ButtonEvent ev);
     void _handleSimSending(ButtonEvent ev);
     void _handleSimResult(ButtonEvent ev);
-    void _handleNetworkMenu(ButtonEvent ev);
-    void _handleNetworkStatus(ButtonEvent ev); // new
-    void _handleBuzzerMenu(ButtonEvent ev); // new
+    void _handleNetworkStatus(ButtonEvent ev); 
+    void _handleSystemSetup(ButtonEvent ev); 
+
+#if SENSOR_COUNT == 3
+    // Handler ที่มีเฉพาะรุ่น 3 หัว
+    void _handleMonitorMenu(ButtonEvent ev);
+    void _handleThreshParamMenu(ButtonEvent ev);
+    void _handleCalParamMenu(ButtonEvent ev);
+#endif
 };

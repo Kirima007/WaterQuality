@@ -15,6 +15,45 @@
 #include "WifiTask.h"
 
 // ==========================================
+// Task Configurations (Stack, Priority, Core)
+// ==========================================
+#define SENSOR_TASK_STACK      4096
+#define SENSOR_TASK_PRIORITY   4
+#define SENSOR_TASK_CORE       0
+
+#define GPS_TASK_STACK         4096
+#define GPS_TASK_PRIORITY      1
+#define GPS_TASK_CORE          0
+
+#define SOUND_TASK_STACK       1024
+#define SOUND_TASK_PRIORITY    2
+#define SOUND_TASK_CORE        0
+
+#define ALARM_TASK_STACK       2048
+#define ALARM_TASK_PRIORITY    3
+#define ALARM_TASK_CORE        0
+
+#define SIM_TASK_STACK         8192
+#define SIM_TASK_PRIORITY      2
+#define SIM_TASK_CORE          0
+
+#define WIFI_TASK_STACK        8192
+#define WIFI_TASK_PRIORITY     2
+#define WIFI_TASK_CORE         0
+
+#define DISPLAY_TASK_STACK     8192
+#define DISPLAY_TASK_PRIORITY  2
+#define DISPLAY_TASK_CORE      1
+
+#define INPUT_TASK_STACK       2048
+#define INPUT_TASK_PRIORITY    3
+#define INPUT_TASK_CORE        1
+
+#define ROTARY_TASK_STACK      2048
+#define ROTARY_TASK_PRIORITY   4
+#define ROTARY_TASK_CORE       1
+
+// ==========================================
 // Objects
 // ==========================================
 LiquidCrystal_I2C lcd(0x27, 20, 4);
@@ -38,7 +77,7 @@ void displayTask(void* param) {
     StateMachine* sm = static_cast<StateMachine*>(param);
     ButtonEvent ev;
 
-    requestSound(SoundEvent::SELECT);
+    requestSound(SoundEvent::SUCCESS);
     vTaskDelay(pdMS_TO_TICKS(STARTUP_DELAY_MS));
     sm->begin();
 
@@ -75,7 +114,7 @@ void setup() {
     // สร้าง Tasks
     // ==========================================
 
-    // --- Core 0: Sensing ---
+    // --- Core 0: Sensing & Backend ---
     xTaskCreatePinnedToCore(
         SensorTask::taskEntry, "Sensor",
         SENSOR_TASK_STACK, nullptr,
@@ -90,8 +129,8 @@ void setup() {
 
     xTaskCreatePinnedToCore(
         SoundManager::taskEntry, "Sound",
-        2048, &soundMgr,
-        1, nullptr, 0
+        SOUND_TASK_STACK, &soundMgr,
+        SOUND_TASK_PRIORITY, nullptr, SOUND_TASK_CORE
     );
 
     xTaskCreatePinnedToCore(
@@ -99,19 +138,21 @@ void setup() {
         ALARM_TASK_STACK, &alarmTask,
         ALARM_TASK_PRIORITY, nullptr, ALARM_TASK_CORE
     );
+
     xTaskCreatePinnedToCore(
         SimTask::taskEntry, "SIM",
         SIM_TASK_STACK, &stateMachine,
         SIM_TASK_PRIORITY, nullptr, SIM_TASK_CORE
     );
+
     xTaskCreatePinnedToCore(
         WifiTask::taskEntry, "WiFi",
         WIFI_TASK_STACK, &stateMachine,
         WIFI_TASK_PRIORITY, nullptr, WIFI_TASK_CORE
-        );
+    );
 
 
-    // --- Core 1: UI ---
+    // --- Core 1: UI & Input ---
     xTaskCreatePinnedToCore(
         ScreenManager::taskEntry, "Screen",
         DISPLAY_TASK_STACK, &screenMgr,
@@ -120,14 +161,14 @@ void setup() {
 
     xTaskCreatePinnedToCore(
         displayTask, "Input",
-        4096, &stateMachine,
-        3, nullptr, 1    // priority สูง ตอบสนองเร็ว
+        INPUT_TASK_STACK, &stateMachine,
+        INPUT_TASK_PRIORITY, nullptr, INPUT_TASK_CORE
     );
 
     xTaskCreatePinnedToCore(
         RotaryInput::taskEntry, "Rotary",
-        2048, &rotary,            // ส่ง object rotary เข้าไปทำงาน
-        2, nullptr, 1             // Priority กลางๆ รันบน Core 1
+        ROTARY_TASK_STACK, &rotary,
+        ROTARY_TASK_PRIORITY, nullptr, ROTARY_TASK_CORE
     );
 
 }

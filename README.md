@@ -1,128 +1,115 @@
-# WaterQuality
+# 🌊 WaterQuality Monitoring System (ESP32)
 
-โปรเจกต์ WaterQuality เป็นระบบวัดความเค็มน้ำและส่งข้อมูลผ่าน SIM/GPRS บนบอร์ด ESP32
-โดยออกแบบสำหรับบอร์ดที่มีโมดูล SIM800L ในตัว เช่น TTGO T-Call V1.4
+A robust, real-time water quality monitoring system built on the **ESP32** platform. This project features high-precision sensor reading, GPS tracking, and dual-mode data transmission (WiFi/GPRS) designed for environmental monitoring and IoT applications.
 
-## ฟีเจอร์หลัก
+---
 
-- วัดค่าความเค็ม (PPT) โดยใช้ ADS1115 และสูตรปรับ calibrate
-- วัดอุณหภูมิด้วย DS18B20
-- จอ LCD 20x4 แสดงผลข้อมูลและเมนู
-- เมนูควบคุมด้วย rotary encoder พร้อมปุ่มกด
-- เชื่อมต่อ GPRS ด้วย SIM800L และส่งข้อมูล HTTP POST ไปยังเซิร์ฟเวอร์
-- เชื่อมต่อ Wi-Fi และส่งข้อมูล HTTP POST ไปยังเซิร์ฟเวอร์
-- มีหน้า System Info แสดง Device ID, Sensor CH และข้อความ `by AIOT LAB`
-- มีการแจ้งเตือน LED/Buzzer เมื่อค่าความเค็มอยู่ในระดับเตือนหรืออันตราย
-- Calibration ด้วยน้ำ DI และสารละลายน้ำที่มีค่า EC เป้าหมาย
+## 🚀 Key Features
 
-## เมนูหลัก
+*   **Multi-Channel Support:** Dynamic support for 1-Channel (Salinity) or 3-Channel (Salinity, pH, DO) sensor configurations via build environments.
+*   **High-Precision Sensing:** Uses the **ADS1115 (16-bit ADC)** for accurate analog readings with temperature compensation.
+*   **Dual Connectivity:** Flexible data reporting via **SIM800L (GSM/GPRS)** or **WiFi**, configurable through the system menu.
+*   **GPS Integration:** Automatically logs Latitude/Longitude coordinates with every sensor data point.
+*   **Interactive UI:** Large 20x4 LCD interface with a rotary encoder for menu navigation and system configuration.
+*   **On-Device Calibration:** Built-in calibration wizard for DI Water and Salt Solutions, saving values directly to Non-Volatile Storage (NVS).
+*   **Real-time Multitasking:** Powered by **FreeRTOS**, ensuring seamless sensor sampling, UI responsiveness, and background data transmission.
 
-- Read Temp
-- Read GPS
-- LED Threshold
-- Calibrate Mode
-- System Info
-- Back
+---
 
-## Calibration
+## 🛠 Hardware Architecture
 
-โหมด Calibrate มีสองขั้นตอนหลัก:
+### Core Components
+*   **Microcontroller:** ESP32 (Tested on TTGO T-Call V1.4)
+*   **Sensors:** 
+    *   **ADS1115:** 16-bit I2C ADC for water quality sensors.
+    *   **DS18B20:** OneWire temperature sensor.
+    *   **GPS Module:** Serial NEO-6M or compatible.
+*   **Communication:**
+    *   **SIM800L:** GSM/GPRS modem for remote logging.
+    *   **WiFi:** Integrated ESP32 WiFi for local hotspot connectivity.
+*   **User Interface:**
+    *   **LCD 20x4:** I2C display.
+    *   **Rotary Encoder:** Navigation (CLK, DT, SW).
+    *   **Buzzer & RGB LED:** Status and alarm notifications.
 
-1. Calibrate DI Water
-   - target EC = `1.413 us/cm`
-2. Calibrate Salt Solution
-   - target EC = `12.88 ms/cm`
+### Pin Mapping (Default)
+| Component | Pin | Function |
+| :--- | :--- | :--- |
+| **Rotary Encoder** | 32, 33, 14 | CLK, DT, SW |
+| **OneWire (Temp)** | 18 | DS18B20 Data |
+| **GPS** | 19 (RX), 25 (TX) | Serial Communication |
+| **Buzzer** | 2 | Alarm Output |
+| **I2C (LCD/ADC)** | 21 (SDA), 22 (SCL) | Bus Communication |
+| **RGB LED** | 15, 13, 12 | R, G, B Status (3-CH mode) |
 
-หลัง calibration โปรแกรมจะคำนวณค่า `alpha` และ `beta` และเก็บใน NVS
+---
 
-## การเชื่อมต่อเครือข่าย
+## 💻 Software Architecture
 
-ระบบรองรับสองโหมดการส่งข้อมูล:
+The system utilizes a **Multi-tasking architecture** based on FreeRTOS to handle complex operations without blocking the main logic:
 
-### โหมด SIM/GPRS
-- ใช้โมดูล SIM800L ในตัวบอร์ด TTGO T-Call V1.4
-- ส่งข้อมูลผ่าน HTTP POST ไปยังเซิร์ฟเวอร์
-- เหมาะสำหรับการใช้งานในพื้นที่ห่างไกลที่ไม่มี Wi-Fi
+*   **SensorTask (Core 0):** High-frequency sampling of ADC and Temperature data.
+*   **GPSTask (Core 0):** Asynchronous parsing of NMEA strings from the GPS module.
+*   **Network Tasks (Core 0):** Independent tasks for SIM800L and WiFi state management and HTTP POST requests.
+*   **ScreenManager (Core 1):** Dedicated UI rendering and LCD updates.
+*   **StateMachine (Core 1):** Central logic handling user inputs, menu navigation, and system states.
 
-### โหมด Wi-Fi
-- เชื่อมต่อกับ Wi-Fi hotspot
-- ส่งข้อมูลผ่าน HTTP POST ไปยังเซิร์ฟเวอร์เดียวกัน
-- เหมาะสำหรับการใช้งานในพื้นที่ที่มี Wi-Fi
+---
 
-การเลือกโหมดเครือข่ายสามารถทำได้ผ่านเมนูหรือตั้งค่าในโค้ด
+## 📦 Getting Started
 
-## ฮาร์ดแวร์ที่ใช้
+### 1. Prerequisites
+*   Visual Studio Code with **PlatformIO IDE** extension.
+*   ESP32 Development Board.
 
-- บอร์ด ESP32 (TTGO T-Call V1.4)
-- จอ LCD I2C 20x4
-- Rotary encoder
-- ADS1115 ADC module
-- DS18B20 temperature sensor
-- GPS module (TinyGPSPlus)
-- SIM800L/GPRS module (TinyGSM)
-- Buzzer และ RGB LED
-
-## การติดตั้งและคอมไพล์
-
-1. เปิดโปรเจกต์ด้วย PlatformIO
-2. ตรวจสอบ `platformio.ini`
-3. กด build หรือ upload เพื่อแฟลชโค้ดไปยังบอร์ด
-
-```ini
-[env:esp32dev]
-platform = espressif32
-board = esp32dev
-framework = arduino
-lib_deps =
-  marcoschwartz/LiquidCrystal_I2C@^1.1.4
-  madhephaestus/ESP32Encoder@^0.12.0
-  adafruit/Adafruit ADS1X15@^2.6.2
-  paulstoffregen/OneWire@^2.3.8
-  milesburton/DallasTemperature@^4.0.6
-  mikalhart/TinyGPSPlus@^1.1.0
-  vshymanskyy/TinyGSM@^0.12.0
-  arduino-libraries/ArduinoHttpClient@^0.6.1
-  bblanchon/ArduinoJson@^7.2.2
-
-board_build.flash_mode = dio
-monitor_speed = 115200
+### 2. Configuration
+Modify `src/Config.h` to match your deployment environment:
+```cpp
+#define DEVICE_ID       99
+#define SIM_APN         "internet"        // APN (e.g., "internet", "ais", "true")
+#define WIFI_SSID       "Your_SSID"
+#define WIFI_PASS       "Your_Password"
+#define HTTP_HOST       "your.api.endpoint"
 ```
 
-## ค่าการตั้งค่าในโค้ด
+### 3. Build & Flash
+Choose the environment based on your hardware setup:
 
-ดูไฟล์ `src/Config.h` สำหรับการตั้งค่าต่อไปนี้:
+*   **1-Channel Mode:** `pio run -e Sensor_1 -t upload`
+*   **3-Channel Mode:** `pio run -e Sensor_3 -t upload`
 
-- `ENC_CLK`, `ENC_DT`, `ENC_SW` - พิน rotary encoder
-- `RGB_R`, `RGB_G`, `RGB_B` - พิน LED
-- `BUZZER` - พิน buzzer
-- `ONE_WIRE` - พิน DS18B20
-- `GPS_RX`, `GPS_TX` - พิน GPS
-- `WIFI_SSID`, `WIFI_PASS` - ชื่อและรหัสผ่าน Wi-Fi hotspot
-- `SIM_APN` - APN ของซิม
-- `HTTP_HOST`, `HTTP_PORT`, `HTTP_PATH` - endpoint สำหรับส่งข้อมูล
-- `DEVICE_ID` - รหัสอุปกรณ์
+---
 
-## โครงสร้างหลักของโค้ด
+## 📖 User Guide
 
-- `src/main.cpp` - สร้าง task และตั้งค่าเริ่มต้น
-- `src/ScreenManager.cpp` - แสดงผลบน LCD
-- `src/StateMachine.cpp` - ควบคุมสถานะและเมนู
-- `src/Sensor.cpp` - อ่านค่าจาก ADS1115 และ DS18B20
-- `src/Sim.cpp` - จัดการการเชื่อมต่อ SIM/GPRS และส่ง HTTP
-- `src/WifiTask.cpp` - จัดการการเชื่อมต่อ Wi-Fi และส่ง HTTP
-- `src/SalinityCalc.cpp` - คำนวณความเค็มและ calibration
-- `src/SoundManager.cpp` - ควบคุมเสียง buzzer
-- `src/Alarmtask.cpp` - แจ้งเตือน LED/Buzzer ตามค่าความเค็ม
+### Navigation
+*   **Rotate Encoder:** Navigate through menus or change values.
+*   **Short Press:** Confirm selection or enter a menu.
+*   **Long Press:** Exit or go back to the previous screen.
 
-## หมายเหตุ
+### Calibration Procedure
+1.  Enter **Calibration Mode** from the Main Menu.
+2.  Follow the **DI Water** prompt: Submerge the sensor in distilled water and wait for the reading to stabilize.
+3.  Follow the **Salt Solution** prompt: Submerge the sensor in the standard salt solution.
+4.  Confirm and save: The system will calculate the slope and offset and store them in the NVS.
 
-- ตรวจสอบว่า SIM ได้เปิดใช้งานและใส่ซิมเรียบร้อย
-- สำหรับโหมด Wi-Fi ให้ตั้งค่า `WIFI_SSID` และ `WIFI_PASS` ให้ตรงกับ hotspot ที่ต้องการเชื่อมต่อ
-- สามารถเปลี่ยนโหมดเครือข่ายระหว่าง SIM และ Wi-Fi ได้ตามความเหมาะสมของสภาพแวดล้อม
-- ปรับ `SIM_APN` ให้ตรงกับผู้ให้บริการ (DTAC/True/AIS)
-- แหล่งจ่ายไฟต้องเพียงพอสำหรับ SIM800L
-- หน้าจอ `System Info` จะแสดง Device ID และ Sensor CH เป็น `CH0`
+### Data Reporting
+Data is automatically packaged into a JSON payload and sent to the configured `HTTP_HOST`:
+```json
+{
+  "id": 99,
+  "salinity": "12.85",
+  "temp": "28.5",
+  "address": {
+    "x": "13.123456",
+    "y": "100.123456"
+  }
+}
+```
 
-## ผู้พัฒนา
+---
 
-- AIOT LAB
+## 🏷️ Credits
+**Developed by:** Weerapat C. (2026)  
+**Laboratory:** AIOT LAB  
+**Version:** V1.2(A)

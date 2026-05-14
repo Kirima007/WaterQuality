@@ -40,8 +40,13 @@ public:
 #if SENSOR_COUNT == 3
     static CalibData calibPH;
     static CalibData calibDO;
-#endif
+
+    static ThreshData threshEC;
+    static ThreshData threshPH;
+    static ThreshData threshDO;
+#else
     static ThreshData thresh;
+#endif
     static SystemConfig config;
 
 private:
@@ -57,12 +62,22 @@ private:
     static const char* KEY_PH_B;
     static const char* KEY_DO_A;
     static const char* KEY_DO_B;
-#endif
 
-    // Keys สำหรับ Threshold และ Config
+    static const char* KEY_TH_EC_G;
+    static const char* KEY_TH_EC_Y;
+    static const char* KEY_TH_EC_R;
+    static const char* KEY_TH_PH_G;
+    static const char* KEY_TH_PH_Y;
+    static const char* KEY_TH_PH_R;
+    static const char* KEY_TH_DO_G;
+    static const char* KEY_TH_DO_Y;
+    static const char* KEY_TH_DO_R;
+#else
     static const char* KEY_THRESH_G;
     static const char* KEY_THRESH_Y;
     static const char* KEY_THRESH_R;
+#endif
+
     static const char* KEY_NET_MODE;
     static const char* KEY_IS_MUTED;
 };

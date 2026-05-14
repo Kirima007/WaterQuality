@@ -7,6 +7,7 @@ struct SensorData {
     uint32_t timestamp;
     float tempC;      // อุณหภูมิน้ำ
     bool  tempValid;  // อ่านอุณหภูมิสำเร็จไหม
+    bool  adsValid;   // ADS1115 ติดต่อได้ไหม
 
     // --- เซ็นเซอร์ 1: ความเค็ม ---
     float voltEC;     // ค่าแรงดันดิบ
@@ -28,11 +29,13 @@ struct GPSData {
     double lat, lng; //ละติจูดและลองจิจูด
     bool valid; //GPS lock แล้วหรือยัง
     uint8_t satellites; //จำนวนดาวเทียมที่จับได้
+    bool serialError; // เช็คว่ามีการส่งข้อมูลจากโมดูล GPS หรือไม่
 };
 
 enum class ButtonEvent {
     SHORT_PRESS,
     LONG_PRESS,
+    SUPER_LONG_PRESS,
     ROTATE_CW,
     ROTATE_CCW
 };

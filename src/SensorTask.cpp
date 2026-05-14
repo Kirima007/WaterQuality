@@ -27,7 +27,8 @@ void SensorTask::taskEntry(void* param) {
     
     // ADS1115
     Adafruit_ADS1115 ads;
-    if (!ads.begin()) {
+    bool adsPresent = ads.begin();
+    if (!adsPresent) {
         Serial.println("[SENSOR] WARNING: ADS1115 not found!");
     }
     ads.setGain(GAIN_ONE);
@@ -41,51 +42,89 @@ void SensorTask::taskEntry(void* param) {
     // --- ตัวแปรภายใน Task ---
     SensorData data{};
     data.tempC = 25.0f; // ตั้งค่าเริ่มต้นเป็น 25 องศา เผื่อเซ็นเซอร์อ่านไม่ได้
-    bool tempReady = false;
+    data.tempValid = false;
+    data.adsValid = adsPresent;
+    bool tempRequestPending = false;
 
     // Request อุณหภูมิครั้งแรก
     ds.requestTemperatures();
+    tempRequestPending = true;
 
     // ==========================================
     // Main Loop
     // ==========================================
     for (;;) {
         // --- 1. จัดการอุณหภูมิ ---
-        if (tempReady) {
+        if (tempRequestPending) {
             float t = ds.getTempCByIndex(0);
 
             // เช็คว่าอ่านค่าได้จริง
             if (t != DEVICE_DISCONNECTED_C && t > -20.0f && t < 80.0f) {
                 data.tempC = t;
+                data.tempValid = true;
             } else {
                 // Fallback: ถ้าระบบหาเซ็นเซอร์อุณหภูมิไม่เจอ ให้ล็อกค่าไว้ที่ 25°C 
                 data.tempC = 25.0f; 
+                data.tempValid = false;
             }
         }
 
         // Request อุณหภูมิรอบต่อไป (เพื่อเอาไว้อ่านใน Loop หน้า)
         ds.requestTemperatures();
-        tempReady = true;
-
-        int16_t rawAvg    = readADSAvg(ads, 0, 10);
-        data.voltEC  = ads.computeVolts(rawAvg);
-
-        // ดึงค่า calibration จาก NVSManager มาเข้าสมการของ SensorMath
-
-        data.valEC = SensorMath::calculateEC(
-            data.voltEC,
-            data.tempC,
-            NVSManager::calibEC.alpha,
-            NVSManager::calibEC.beta
-        );
-        data.valPPT = SensorMath::calculate(
-            data.voltEC,
-            data.tempC,
-            NVSManager::calibEC.alpha,
-            NVSManager::calibEC.beta
-        );
+        tempRequestPending = true;
 
         data.timestamp = millis();
+        
+        // Re-check ADS if it was not found initially (optional but safer)
+        if (!data.adsValid) {
+            data.adsValid = ads.begin();
+        }
+
+        if (data.adsValid) {
+#if SENSOR_COUNT == 1
+            int16_t rawAvg    = readADSAvg(ads, 0, 10);
+            data.voltEC  = ads.computeVolts(rawAvg);
+
+            data.valEC = SensorMath::calculateEC(
+                data.voltEC,
+                data.tempC,
+                NVSManager::calibEC.alpha,
+                NVSManager::calibEC.beta
+            );
+            data.valPPT = SensorMath::calculate(
+                data.voltEC,
+                data.tempC,
+                NVSManager::calibEC.alpha,
+                NVSManager::calibEC.beta
+            );
+#else
+            // --- READ EC (A0) ---
+            int16_t rawEC = readADSAvg(ads, 0, 10);
+            data.voltEC   = ads.computeVolts(rawEC);
+            data.valEC    = SensorMath::calculateEC(data.voltEC, data.tempC, NVSManager::calibEC.alpha, NVSManager::calibEC.beta);
+            data.valPPT   = SensorMath::calculate(data.voltEC, data.tempC, NVSManager::calibEC.alpha, NVSManager::calibEC.beta);
+
+            // --- READ pH (A1) ---
+            int16_t rawPH = readADSAvg(ads, 1, 10);
+            data.voltPH   = ads.computeVolts(rawPH);
+            data.valPH    = SensorMath::calculatePH(data.voltPH, data.tempC, NVSManager::calibPH.alpha, NVSManager::calibPH.beta);
+
+            // --- READ DO (A2) ---
+            int16_t rawDO = readADSAvg(ads, 2, 10);
+            data.voltDO   = ads.computeVolts(rawDO);
+            data.valDO    = SensorMath::calculateDO(data.voltDO, data.tempC, NVSManager::calibDO.alpha, NVSManager::calibDO.beta);
+#endif
+        } else {
+            // ADS missing -> set values to 0 or something distinctive
+            data.valPPT = 0.0f;
+            data.valEC = 0.0f;
+#if SENSOR_COUNT == 3
+            data.valPH = 0.0f;
+            data.valDO = 0.0f;
+#endif
+        }
+
+
         xQueueOverwrite(sensorQueue, &data); // ส่งเข้า Queue ให้ UI นำไปโชว์
 
         // หน่วงเวลาของ Task

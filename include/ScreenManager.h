@@ -8,9 +8,6 @@
 #include "NVSManager.h"
 
 #define DISPLAY_TASK_DELAY_MS  25    // วาด LCD ทุก 25ms (40fps)
-#define DISPLAY_TASK_STACK     8192
-#define DISPLAY_TASK_PRIORITY  1
-#define DISPLAY_TASK_CORE      1
 
 class ScreenManager {
 public:
@@ -32,7 +29,7 @@ private:
     // ดึงข้อมูลจาก Queue
     void _updateData();
 
-    // วาดแต่ละหน้า
+    // วาดแต่ละหน้า (ใช้ร่วมกันทั้ง 1 หัวและ 3 หัว)
     void _drawStartup();
     void _drawMainScreen();
     void _drawMainMenu();
@@ -44,16 +41,19 @@ private:
     void _drawSystemInfo();
     void _drawCalmanual();
     void _drawEditCalManual();
-    void _drawCalDI();
-    void _drawCalSalt();
+    void _drawCal1();
+    void _drawCal2();
     void _drawCalFinish(); 
     void _drawCalCancelConfirm();
-    // void _drawSimStatus();
     void _drawSimSending(); 
     void _drawSimResult();
-    void _drawNetworkMenu();
     void _drawNetworkStatus();
-    void _drawBuzzerMenu();
+    void _drawSystemSetup();
+
+#if SENSOR_COUNT == 3
+    // วาดหน้าจอที่มีเฉพาะในรุ่น 3 หัว
+    void _drawSensorSelectMenu();
+#endif
 
     // Helper: พิมพ์ตัวเลขให้ชิดขวาในความกว้างที่กำหนด
     void _printPadded(float val, int decimals, int width);

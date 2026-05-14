@@ -18,24 +18,22 @@
 #define MODEM_RST        5
 #define MODEM_PWRKEY     4
 
-// Task settings
-#define SIM_TASK_STACK     8192
-#define SIM_TASK_PRIORITY  1
-#define SIM_TASK_CORE      0
 
 class SimTask {
 public:
     static void taskEntry(void* param);
     static bool isConnected();  // SIM/GPRS ต่ออยู่ไหม
     static int  getSignalQuality();
-    static void requestSend(); // เรียกจาก StateMachine เมื่ออยากส่งข้อมูล
-    static void requestSendCalib(); // เรียกจาก StateMachine เมื่ออยากส่งข้อมูลการปรับค่า
+    static void requestSend(uint8_t sensorIndex = 0); // เรียกจาก StateMachine เมื่ออยากส่งข้อมูล
+    static void requestSendCalib(uint8_t sensorIndex = 0); // เรียกจาก StateMachine เมื่ออยากส่งข้อมูลการปรับค่า
 
 
 private:
     static volatile bool _connected;
     static volatile bool _sendRequested;
     static volatile bool _sendCalibRequested;
+    static volatile uint8_t _reqSensorIdx;
+    static volatile uint8_t _reqCalibIdx;
     static volatile int  _signalQuality;
     
     
