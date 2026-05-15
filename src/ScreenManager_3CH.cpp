@@ -39,6 +39,7 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::EDIT_THRESH:          self->_drawEditThresh();        break;
             case AppState::CAL_PARAM_MENU:       self->_drawSensorSelectMenu();  break;
             case AppState::CAL_MENU:             self->_drawCalMenu();           break;
+            case AppState::TEMP_CAL:             self->_drawTempCal();           break;
             case AppState::SYSTEM_INFO:          self->_drawSystemInfo();        break;
             case AppState::CAL_MANUAL:           self->_drawCalmanual();         break;
             case AppState::EDIT_CAL_MANUAL:      self->_drawEditCalManual();     break;
@@ -73,17 +74,17 @@ void ScreenManager::_printPadded(float val, int decimals, int width) {
 // ==========================================
 void ScreenManager::_drawStartup() {
     // ตกแต่งหน้าจอ Startup ให้สวยงามและอยู่กึ่งกลาง (จอ 20x4)
-    _lcd.setCursor(2, 0);  // 17 ตัวอักษร -> ขยับมาที่ช่อง 1 จะอยู่ตรงกลางพอดี
+    _lcd.setCursor(1, 0);  // 17 ตัวอักษร (20-17)/2 = 1.5 -> เริ่มที่ช่อง 1
     _lcd.print("Water Quality BK.");
     
     _lcd.setCursor(4, 1);  // 12 ตัวอักษร -> ขยับมาที่ช่อง 4 จะอยู่ตรงกลางพอดี
     _lcd.print("System Ready");
     
-    // โชว์เวอร์ชันของเฟิร์มแวร์บรรทัดล่างสุด
-    char buf[21];
-    snprintf(buf, sizeof(buf), "    FW: %-12.12s", FW_VERSION);
-    _lcd.setCursor(0, 3);
-    _lcd.print(buf);
+    // โชว์เวอร์ชันของเฟิร์มแวร์บรรทัดล่างสุด (จัดกึ่งกลางอัตโนมัติ)
+    String fwMsg = String("Version: ") + FW_VERSION;
+    int startPos = (20 - fwMsg.length()) / 2;
+    _lcd.setCursor(startPos < 0 ? 0 : startPos, 3);
+    _lcd.print(fwMsg);
 }
 
 void ScreenManager::_drawMainScreen() {
@@ -164,9 +165,16 @@ void ScreenManager::_drawMainScreen() {
 }
 
 void ScreenManager::_drawMainMenu() {
-    const int totalItems = 7; // ลบ Back ออก
+    const int totalItems = 8; // ลบ Back ออก
     const char* items[totalItems] = { 
-        "Monitor Data", "Network Status", "Setting", "Read GPS", "LED Threshold", "Calibrate Mode", "System Info" 
+        "Monitor Data",
+        "Network Status",
+        "GPS Status",
+        "Setting",
+        "Sensor Calibrate",
+        "Temp Calibrate",
+        "Alarm Limits",
+        "System Info" 
     };
     int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, totalItems - 4); 
     
@@ -281,6 +289,21 @@ void ScreenManager::_drawCalMenu() {
     _lcd.print("["); _lcd.print(pfx); _lcd.print("]");
 }
 
+void ScreenManager::_drawTempCal() {
+    _lcd.setCursor(0, 0); _lcd.print("--- Temp Calib ---  ");
+    
+    _lcd.setCursor(0, 1); _lcd.print(" Offset : [");
+    _printPadded(NVSManager::tempOffset, 1, 5); _lcd.print("]  ");
+    
+    char buf[21];
+    snprintf(buf, sizeof(buf), " Current: %-5.1f", _sensor.tempC);
+    _lcd.setCursor(0, 2); _lcd.print(buf);
+    _lcd.print((char)223); // สัญลักษณ์องศา (°)
+    _lcd.print("C  ");
+    
+    _lcd.setCursor(0, 3); _lcd.print("   Click to Save    ");
+}
+
 void ScreenManager::_drawCal1() {
     char buf[21];
     const char* targets[] = { "Target: 1.413 mS/cm", "Target: 4.0 pH     ", "Target: 0.0 mg/L   " };
@@ -315,14 +338,20 @@ void ScreenManager::_drawCalFinish() {
     _lcd.setCursor(0, 0); 
     _lcd.print("--- Calibration --- ");
     
-    _lcd.setCursor(0, 1); 
-    _lcd.print("  Calibrate Finish! ");
-    
-    _lcd.setCursor(0, 2); 
-    _lcd.print("     Success!!!     ");
+    if (_sm.calibSuccess) {
+        _lcd.setCursor(0, 1); 
+        _lcd.print("  Calibrate Finish! ");
+        _lcd.setCursor(0, 2); 
+        _lcd.print("     Success!!!     ");
+    } else {
+        _lcd.setCursor(0, 1); 
+        _lcd.print("  Calibrate Failed! ");
+        _lcd.setCursor(0, 2); 
+        _lcd.print("    Math Error!!    ");
+    }
     
     _lcd.setCursor(0, 3); 
-    _lcd.print("                    ");
+    _lcd.print("   Please Wait...   ");
 }
 
 void ScreenManager::_drawCalCancelConfirm() {
@@ -393,13 +422,13 @@ void ScreenManager::_drawSystemSetup() {
 
     _lcd.setCursor(0, 1);
     _lcd.print(_sm.menuIndex == 0 ? "> " : "  ");
-    _lcd.print("Buzzer   : [");
-    _lcd.print(NVSManager::config.isMuted ? "OFF]  " : "ON ]  ");
+    _lcd.print("Net Mode : [");
+    _lcd.print(NVSManager::config.networkMode == NET_MODE_SIM ? "SIM]  " : "WIFI] ");
 
     _lcd.setCursor(0, 2);
     _lcd.print(_sm.menuIndex == 1 ? "> " : "  ");
-    _lcd.print("Net Mode : [");
-    _lcd.print(NVSManager::config.networkMode == NET_MODE_SIM ? "SIM]  " : "WIFI] ");
+    _lcd.print("Buzzer   : [");
+    _lcd.print(NVSManager::config.isMuted ? "OFF]  " : "ON ]  ");
 
     _lcd.setCursor(0, 3);
     _lcd.print(_sm.menuIndex == 2 ? "> " : "  ");

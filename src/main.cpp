@@ -92,8 +92,6 @@ void displayTask(void* param) {
 // SETUP
 // ==========================================
 void setup() {
-    Serial2.begin(115200);
-    Serial2.println("Hello");
     // --- I2C ---
     Wire.begin(21, 22);
 

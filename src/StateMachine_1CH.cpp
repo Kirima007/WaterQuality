@@ -58,12 +58,13 @@ void StateMachine::handleEvent(ButtonEvent ev) {
         case AppState::THRESH_MENU:         _handleThreshMenu(ev);              break;
         case AppState::EDIT_THRESH:         _handleEditThresh(ev);              break;
         case AppState::CAL_MENU:            _handleCalMenu(ev);                 break;
+        case AppState::TEMP_CAL:            _handleTempCal(ev);                 break;
         case AppState::SYSTEM_INFO:         _handleSystemInfo(ev);              break;
         case AppState::CAL_MANUAL:          _handleCalManual(ev, sensor);       break;
         case AppState::EDIT_CAL_MANUAL:     _handleEditCalManual(ev);           break;
         case AppState::CAL_DI:              _handleCalDI(ev, sensor);           break;
         case AppState::CAL_SALT:            _handleCalSalt(ev, sensor);         break;
-        case AppState::CAL_FINISH:          _handleCalFinish();                 break;
+        // CAL_FINISH ไม่รอรับ Event เพื่อให้มันข้ามไปส่งข้อมูลโดยอัตโนมัติ
         case AppState::CAL_CANCEL_CONFIRM:  _handleCalCancelConfirm(ev);        break;
         // case AppState::SIM_STATUS:          _handleSimStatus(ev);               break;
         case AppState::SIM_SENDING:         _handleSimSending(ev);              break;
@@ -106,19 +107,18 @@ void StateMachine::_handleMainMenu(ButtonEvent ev) {
         requestSound(SoundEvent::SCROLL);
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         switch (menuIndex) {
-            case 0: _goTo(AppState::READ_TEMP);       requestSound(SoundEvent::SELECT); break;
-            case 1: 
-                _goTo(AppState::NETWORK_STATUS);      requestSound(SoundEvent::SELECT); break;
+            case 0: _goTo(AppState::NETWORK_STATUS);  requestSound(SoundEvent::SELECT); break;
+            case 1: _goTo(AppState::READ_GPS);        requestSound(SoundEvent::SELECT); break;
             case 2: 
                 menuIndex = 0;
                 _goTo(AppState::SYSTEM_SETUP);        requestSound(SoundEvent::SELECT); break;
-            case 3: _goTo(AppState::READ_GPS);        requestSound(SoundEvent::SELECT); break;
-            case 4: 
-                menuIndex = 0;
-                _goTo(AppState::THRESH_MENU);         requestSound(SoundEvent::SELECT); break;
-            case 5: 
+            case 3: 
                 menuIndex = 0;
                 _goTo(AppState::CAL_MENU);            requestSound(SoundEvent::SELECT); break;
+            case 4: _goTo(AppState::TEMP_CAL);        requestSound(SoundEvent::SELECT); break;
+            case 5: 
+                menuIndex = 0;
+                _goTo(AppState::THRESH_MENU);         requestSound(SoundEvent::SELECT); break;
             case 6: _goTo(AppState::SYSTEM_INFO);     requestSound(SoundEvent::SELECT); break;
             case 7: _goTo(AppState::MAIN_SCREEN);     requestSound(SoundEvent::BACK);   break;
         }
@@ -139,7 +139,7 @@ void StateMachine::_handleReadTemp(ButtonEvent ev) {
 void StateMachine::_handleReadGPS(ButtonEvent ev) {
     if (ev == ButtonEvent::SHORT_PRESS) {
         requestSound(SoundEvent::BACK);
-        menuIndex = 3;
+        menuIndex = 1;
         _goTo(AppState::MAIN_MENU);
     }
 }
@@ -150,10 +150,10 @@ void StateMachine::_handleReadGPS(ButtonEvent ev) {
 void StateMachine::_handleThreshMenu(ButtonEvent ev) {
     if (ev == ButtonEvent::ROTATE_CW) {
         requestSound(SoundEvent::SCROLL);
-        menuIndex = (menuIndex + 1) % 3; // เหลือ 3 สี (G, Y, R) ไม่มี Back
+        menuIndex = (menuIndex + 1) % 4; // เหลือ 3 สี (G, Y, R) ไม่มี Back
     } else if (ev == ButtonEvent::ROTATE_CCW) {
         requestSound(SoundEvent::SCROLL);
-        menuIndex = (menuIndex - 1 + 3) % 3;
+        menuIndex = (menuIndex - 1 + 4) % 4;
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         switch (menuIndex) {
             case 0:
@@ -170,6 +170,11 @@ void StateMachine::_handleThreshMenu(ButtonEvent ev) {
                 editingColor = 'R';
                 _goTo(AppState::EDIT_THRESH);
                 requestSound(SoundEvent::SELECT);
+                break;
+                case 3: // Back
+                menuIndex = 5; // ชี้ที่เมนู Alarm Limits
+                _goTo(AppState::MAIN_MENU);
+                requestSound(SoundEvent::BACK);
                 break;
         }
     }
@@ -211,8 +216,7 @@ void StateMachine::_handleEditThresh(ButtonEvent ev) {
         requestSound(SoundEvent::BACK);
         NVSManager::saveThresh();
         // เซฟเสร็จแล้วให้กลับไปหน้าเมนูหลักเลย
-        menuIndex = 4; // ชี้ที่เมนู LED Threshold
-        _goTo(AppState::MAIN_MENU);
+        _goTo(AppState::THRESH_MENU);
     }
 }
 
@@ -245,13 +249,26 @@ void StateMachine::_handleCalMenu(ButtonEvent ev) {
                 break;
             case 3:  // Back
                 requestSound(SoundEvent::BACK);
-                menuIndex = 5;
+                menuIndex = 3;
                 _goTo(AppState::MAIN_MENU);
                 break;
         }
     }
 }
 
+void StateMachine::_handleTempCal(ButtonEvent ev) {
+    if (ev == ButtonEvent::ROTATE_CW || ev == ButtonEvent::ROTATE_CCW) {
+        requestSound(SoundEvent::SCROLL);
+        float step = (ev == ButtonEvent::ROTATE_CW) ? 0.1f : -0.1f;
+        NVSManager::tempOffset += step;
+        NVSManager::tempOffset = constrain(NVSManager::tempOffset, -10.0f, 10.0f);
+    } else if (ev == ButtonEvent::SHORT_PRESS) {
+        requestSound(SoundEvent::BACK);
+        NVSManager::saveCalib(); // บันทึก Offset ลง NVS
+        menuIndex = 4;           // กลับไปชี้ที่เมนู Temp Calibrate
+        _goTo(AppState::MAIN_MENU);
+    }
+}
 
 void StateMachine::_handleSystemInfo(ButtonEvent ev) {
     if (ev == ButtonEvent::SUPER_LONG_PRESS) {
@@ -259,7 +276,7 @@ void StateMachine::_handleSystemInfo(ButtonEvent ev) {
         NVSManager::reset();
         delay(500); // รอให้เสียงเล่นและบันทึกเสร็จ
         ESP.restart();
-    } else if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
+    } else if (ev == ButtonEvent::SHORT_PRESS) {
         requestSound(SoundEvent::BACK);
         menuIndex = 6;
         _goTo(AppState::MAIN_MENU);
@@ -356,8 +373,33 @@ void StateMachine::_handleCalDI(ButtonEvent ev, const SensorData& sensor) {
 void StateMachine::_handleCalSalt(ButtonEvent ev, const SensorData& sensor) {
     if (ev == ButtonEvent::LONG_PRESS) {
         if (SensorMath::captureStableValue(0, tmp_v_salt, tmp_t_salt)) {
-            requestSound(SoundEvent::SUCCESS);
+            
+            float newAlpha, newBeta;
+            // ทำการคำนวณทันที
+            calibSuccess = SensorMath::computeAlphaBeta(0, tmp_v_di, tmp_t_di, tmp_v_salt, tmp_t_salt, newAlpha, newBeta);
+            
+            if (calibSuccess) {
+                NVSManager::calibEC.alpha  = newAlpha;
+                NVSManager::calibEC.beta   = newBeta; 
+                NVSManager::saveCalib();
+                requestSound(SoundEvent::SUCCESS);
+            } else {
+                requestSound(SoundEvent::BACK);
+            }
+
             _goTo(AppState::CAL_FINISH);
+            vTaskDelay(pdMS_TO_TICKS(1500)); // โชว์หน้าจอ 1.5 วินาที (ไม่ว่าจะ Success หรือ Fail)
+            xQueueReset(inputQueue);
+
+            if (calibSuccess) {
+                if (NVSManager::config.networkMode == NET_MODE_SIM) SimTask::requestSendCalib(0);
+                else WifiTask::requestSendCalib(0);
+                _goTo(AppState::SIM_SENDING); 
+                _returnState = AppState::MAIN_MENU; 
+            } else {
+                menuIndex = 0;
+                _goTo(AppState::CAL_MENU); // ถ้าล้มเหลวก็เด้งกลับหน้าเมนูอัตโนมัติ
+            }
         } else {
             requestSound(SoundEvent::BACK); 
         }
@@ -366,41 +408,6 @@ void StateMachine::_handleCalSalt(ButtonEvent ev, const SensorData& sensor) {
         cancelSelect  = 1;
         requestSound(SoundEvent::SCROLL);
         _goTo(AppState::CAL_CANCEL_CONFIRM);
-    }
-}
-
-void StateMachine::_handleCalFinish() {
-    float newAlpha, newBeta;
-    bool isSuccess = false;
-    // คำนวณหา Alpha/Beta จากค่าน้ำ DI และ Salt ที่เพิ่งจดจำมา
-    if (SensorMath::computeAlphaBeta(0, tmp_v_di, tmp_t_di, tmp_v_salt, tmp_t_salt, newAlpha, newBeta)) {
-        
-        // ถ้าคำนวณสำเร็จ ให้เซฟทุกอย่างลง NVS (หรือ EEPROM ของคุณ)
-        NVSManager::calibEC.alpha  = newAlpha;
-        NVSManager::calibEC.beta   = newBeta; 
-        NVSManager::saveCalib();
-
-        
-        requestSound(SoundEvent::SUCCESS);
-        isSuccess = true;
-    } else {
-        // ถ้าคำนวณพัง (เช่น จุ่มน้ำผิดขวด แรงดันเท่ากัน) ให้ร้องเตือน
-        requestSound(SoundEvent::BACK);
-    }
-    
-    if (isSuccess) {
-        if (NVSManager::config.networkMode == NET_MODE_SIM) {
-            SimTask::requestSendCalib();
-        } else {
-            WifiTask::requestSendCalib();
-        }
-        // เปลี่ยนหน้าจอไปหน้า ส่งข้อมูล
-        _goTo(AppState::SIM_SENDING); 
-        _returnState = AppState::MAIN_MENU; // บังคับให้กลับหน้า Menu หลังส่ง Calib เสร็จ
-    } else {
-        // ถ้า Calibrate พัง (isSuccess เป็น false) ให้เด้งกลับไปหน้าเมนูหลักของ Calibrate แทน
-        menuIndex = 0;
-        _goTo(AppState::CAL_MENU);
     }
 }
 
@@ -474,13 +481,13 @@ void StateMachine::_handleSystemSetup(ButtonEvent ev) {
     } 
     else if (ev == ButtonEvent::SHORT_PRESS) {
         if (menuIndex == 0) {
-            NVSManager::config.isMuted = !NVSManager::config.isMuted;
-            requestSound(SoundEvent::SELECT); 
-            NVSManager::saveConfig();
-        } else if (menuIndex == 1) {
             if (NVSManager::config.networkMode == NET_MODE_SIM) NVSManager::config.networkMode = NET_MODE_WIFI;
             else NVSManager::config.networkMode = NET_MODE_SIM;
             requestSound(SoundEvent::SELECT);
+            NVSManager::saveConfig();
+        } else if (menuIndex == 1) {
+            NVSManager::config.isMuted = !NVSManager::config.isMuted;
+            requestSound(SoundEvent::SELECT); 
             NVSManager::saveConfig();
         } else if (menuIndex == 2) {
             requestSound(SoundEvent::BACK);
@@ -497,7 +504,7 @@ void StateMachine::_handleNetworkStatus(ButtonEvent ev) {
     // หน้านี้แค่แสดงผล ถ้ากดปุ่มอะไรก็ตามให้เด้งกลับไปที่ Main Menu
     if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
         requestSound(SoundEvent::BACK);
-        menuIndex = 1;
+        menuIndex = 0;
         _goTo(AppState::MAIN_MENU);
     }
 

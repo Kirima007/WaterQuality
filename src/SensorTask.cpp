@@ -60,7 +60,7 @@ void SensorTask::taskEntry(void* param) {
 
             // เช็คว่าอ่านค่าได้จริง
             if (t != DEVICE_DISCONNECTED_C && t > -20.0f && t < 80.0f) {
-                data.tempC = t;
+                data.tempC = t + NVSManager::tempOffset;
                 data.tempValid = true;
             } else {
                 // Fallback: ถ้าระบบหาเซ็นเซอร์อุณหภูมิไม่เจอ ให้ล็อกค่าไว้ที่ 25°C 

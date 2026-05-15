@@ -20,7 +20,7 @@
     #define RGB_B 15
 #endif
 
-#define STARTUP_DELAY_MS 3000   // หน้า startup แสดงกี่ ms (เปลี่ยนเป็น 3000 = 3 วินาที)
+#define STARTUP_DELAY_MS 2000   // หน้า startup แสดงกี่ ms (เปลี่ยนเป็น 3000 = 3 วินาที)
 
 #define SIM_APN         "internet"        // APN ของซิม (DTAC=internet, True=true, AIS=ais)
 #define HTTP_HOST       "161.246.157.210" // โฮสต์ปลายทาง
@@ -29,8 +29,8 @@
 #define HTTP_PATH_CALIB_SALINITY "/api/calibrate/salinity"
 #define HTTP_PATH_CALIB_PH       "/api/calibrate/ph"
 #define HTTP_PATH_CALIB_O2       "/api/calibrate/o2"
-#define DEVICE_ID       99           
-#define FW_VERSION  "V1.2(A)"     // Version ของเฟิร์มแวร์
+#define DEVICE_ID       7           
+#define FW_VERSION  "V1.2"     // Version ของเฟิร์มแวร์
 
 
 #define WIFI_SSID "BCK-WIFI"    // ชื่อ Hotspot ที่ให้ผู้ใช้ตั้งตาม

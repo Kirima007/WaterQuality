@@ -15,14 +15,19 @@ ThreshData NVSManager::thresh;
 #endif
 Preferences NVSManager::_prefs;
 SystemConfig NVSManager::config;
+float NVSManager::tempOffset = 0.0f;
 
 // Key names รวมไว้ที่เดียว
 // ถ้าอยากเปลี่ยน key แก้ที่นี่ที่เดียวพอ
+#if SENSOR_COUNT == 3
 const char* NVSManager::NAMESPACE    = "sys_data";
-const char* NVSManager::KEY_EC_A     = "ec_a";
-const char* NVSManager::KEY_EC_B     = "ec_b";
+#else
+const char* NVSManager::NAMESPACE    = "salinity"; // เปลี่ยนกลับไปชี้ที่แฟ้มเก่า
+#endif
 
 #if SENSOR_COUNT == 3
+const char* NVSManager::KEY_EC_A     = "ec_a";
+const char* NVSManager::KEY_EC_B     = "ec_b";
 const char* NVSManager::KEY_PH_A     = "ph_a";
 const char* NVSManager::KEY_PH_B     = "ph_b";
 const char* NVSManager::KEY_DO_A     = "do_a";
@@ -38,6 +43,8 @@ const char* NVSManager::KEY_TH_DO_G = "th_do_g";
 const char* NVSManager::KEY_TH_DO_Y = "th_do_y";
 const char* NVSManager::KEY_TH_DO_R = "th_do_r";
 #else
+const char* NVSManager::KEY_ALPHA    = "alpha";
+const char* NVSManager::KEY_BETA     = "beta";
 const char* NVSManager::KEY_THRESH_G = "th_g";
 const char* NVSManager::KEY_THRESH_Y = "th_y";
 const char* NVSManager::KEY_THRESH_R = "th_r";
@@ -45,6 +52,7 @@ const char* NVSManager::KEY_THRESH_R = "th_r";
 
 const char* NVSManager::KEY_NET_MODE  = "net_mode"; // ← เพิ่ม
 const char* NVSManager::KEY_IS_MUTED  = "is_muted"; // ← เพิ่ม
+const char* NVSManager::KEY_TEMP_OFF  = "tmp_off";
 
 
 // ==========================================
@@ -53,11 +61,11 @@ const char* NVSManager::KEY_IS_MUTED  = "is_muted"; // ← เพิ่ม
 void NVSManager::load() {
     _prefs.begin(NAMESPACE, true); // true = Read Only
 
+#if SENSOR_COUNT == 3
     // 1. โหลดค่า EC (ใช้ตัวเลขบนหัวโพรบ 0.99x เป็นค่า Default ได้เลย)
     calibEC.alpha = _prefs.getFloat(KEY_EC_A, 1.0f); 
     calibEC.beta  = _prefs.getFloat(KEY_EC_B, 0.0f);
 
-#if SENSOR_COUNT == 3
     // 2. โหลดค่า pH และ DO (Default alpha = 1.0)
     calibPH.alpha = _prefs.getFloat(KEY_PH_A, 1.0f);
     calibPH.beta  = _prefs.getFloat(KEY_PH_B, 0.0f);
@@ -78,6 +86,10 @@ void NVSManager::load() {
     threshDO.yellow = _prefs.getFloat(KEY_TH_DO_Y, 4.0f); // DO มักจะเป็นแบบ "ต่ำกว่าแล้วเตือน"
     threshDO.red    = _prefs.getFloat(KEY_TH_DO_R, 3.0f);
 #else
+    // โหลดค่า Calibration (1CH)
+    calibEC.alpha = _prefs.getFloat(KEY_ALPHA, 1.0f); 
+    calibEC.beta  = _prefs.getFloat(KEY_BETA, 0.0f);
+
     // โหลด Threshold (1CH)
     thresh.green = _prefs.getFloat(KEY_THRESH_G, 15.0f);
     thresh.yellow = _prefs.getFloat(KEY_THRESH_Y, 25.0f);
@@ -88,11 +100,14 @@ void NVSManager::load() {
     config.networkMode = _prefs.getUInt(KEY_NET_MODE, 0);
     config.isMuted = _prefs.getBool(KEY_IS_MUTED, false);
 
+    // โหลด Temp Offset
+    tempOffset = _prefs.getFloat(KEY_TEMP_OFF, 0.0f);
+
     _prefs.end();
 
     // --- Validation Logic ---
     auto isSane = [](float alpha, float beta) {
-        return (alpha > 0.01f && alpha < 10.0f) && (beta > -100.0f && beta < 100.0f);
+        return (alpha > 0.001f && alpha < 100.0f) && (beta > -1000.0f && beta < 1000.0f);
     };
 
     if (!isSane(calibEC.alpha, calibEC.beta)) {
@@ -106,6 +121,9 @@ void NVSManager::load() {
         calibDO.alpha = 1.0f; calibDO.beta = 0.0f;
     }
 #endif
+    if (tempOffset < -20.0f || tempOffset > 20.0f) {
+        tempOffset = 0.0f;
+    }
 }
 
 // ==========================================
@@ -114,16 +132,21 @@ void NVSManager::load() {
 void NVSManager::saveCalib() {
     _prefs.begin(NAMESPACE, false); // false = Read/Write
 
+#if SENSOR_COUNT == 3
     _prefs.putFloat(KEY_EC_A, calibEC.alpha);
     _prefs.putFloat(KEY_EC_B, calibEC.beta);
 
-#if SENSOR_COUNT == 3
     _prefs.putFloat(KEY_PH_A, calibPH.alpha);
     _prefs.putFloat(KEY_PH_B, calibPH.beta);
     
     _prefs.putFloat(KEY_DO_A, calibDO.alpha);
     _prefs.putFloat(KEY_DO_B, calibDO.beta);
+#else
+    _prefs.putFloat(KEY_ALPHA, calibEC.alpha);
+    _prefs.putFloat(KEY_BETA, calibEC.beta);
 #endif
+
+    _prefs.putFloat(KEY_TEMP_OFF, tempOffset);
 
     _prefs.end();
 }
@@ -180,6 +203,7 @@ void NVSManager::reset() {
 #endif
 
     config = SystemConfig{}; // <-- เผื่ออยากให้ networkMode กลับเป็น 0 ด้วย
+    tempOffset = 0.0f;
 
     // ลบทุกค่าใน namespace นี้ออกจาก Flash
     _prefs.begin(NAMESPACE, false);

@@ -93,6 +93,7 @@ void WifiTask::taskEntry(void* param) {
             if (millis() - lastWifiCheck > 5000) {
                 Serial.println("[WIFI] Connecting to Hotspot...");
                 WiFi.mode(WIFI_STA);
+                WiFi.setTxPower(WIFI_POWER_19_5dBm); // ตั้งกำลังส่ง Wi-Fi สูงสุด (19.5 dBm)
                 WiFi.begin(WIFI_SSID, WIFI_PASS); // ดึงชื่อ/รหัส จาก Config.h
                 lastWifiCheck = millis();
             }

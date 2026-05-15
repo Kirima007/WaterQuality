@@ -41,6 +41,7 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::THRESH_MENU:          self->_drawThreshMenu();        break;
             case AppState::EDIT_THRESH:          self->_drawEditThresh();        break;
             case AppState::CAL_MENU:             self->_drawCalMenu();           break;
+            case AppState::TEMP_CAL:             self->_drawTempCal();           break;
             case AppState::SYSTEM_INFO:          self->_drawSystemInfo();        break;
             case AppState::CAL_MANUAL:           self->_drawCalmanual();         break;
             case AppState::EDIT_CAL_MANUAL:      self->_drawEditCalManual();     break;
@@ -80,10 +81,18 @@ void ScreenManager::_printPadded(float val, int decimals, int width) {
 // Screens
 // ==========================================
 void ScreenManager::_drawStartup() {
-    _lcd.setCursor(3, 1);
-    _lcd.print("SALINITY METER");
-    _lcd.setCursor(4, 2);
+    // ตกแต่งหน้าจอ Startup ให้สวยงามและอยู่กึ่งกลาง (จอ 20x4)
+    _lcd.setCursor(1, 0);  // 18 ตัวอักษร (20-18)/2 = 1 -> เริ่มที่ช่อง 1
+    _lcd.print("Water Quality DEV.");
+    
+    _lcd.setCursor(4, 1);  // 12 ตัวอักษร -> ขยับมาที่ช่อง 4 จะอยู่ตรงกลางพอดี
     _lcd.print("System Ready");
+    
+    // โชว์เวอร์ชันของเฟิร์มแวร์บรรทัดล่างสุด (จัดกึ่งกลางอัตโนมัติ)
+    String fwMsg = String("Version: ") + FW_VERSION;
+    int startPos = (20 - fwMsg.length()) / 2;
+    _lcd.setCursor(startPos < 0 ? 0 : startPos, 3);
+    _lcd.print(fwMsg);
 }
 
 void ScreenManager::_drawMainScreen() {
@@ -154,14 +163,14 @@ void ScreenManager::_drawMainScreen() {
 void ScreenManager::_drawMainMenu() {
     const int totalItems = 8; // จำนวนเมนูทั้งหมด
     const char* items[totalItems] = {
-        "Read Temp",
         "Network Status", 
+        "GPS Status",
         "Setting", 
-        "Read GPS",
-        "LED Threshold", 
-        "Calibrate Mode", 
+        "Sensor Calibrate",
+        "Temp Calibrate",
+        "Alarm Limits",
         "System Info", 
-        "Back"
+        "Exit Menu"
     };
 
     // คำนวณ index เริ่มต้น
@@ -226,13 +235,13 @@ void ScreenManager::_drawSystemSetup() {
 
     _lcd.setCursor(0, 1);
     _lcd.print(_sm.menuIndex == 0 ? "> " : "  ");
-    _lcd.print("Buzzer   : [");
-    _lcd.print(NVSManager::config.isMuted ? "OFF]  " : "ON ]  ");
+    _lcd.print("Net Mode : [");
+    _lcd.print(NVSManager::config.networkMode == NET_MODE_SIM ? "SIM]  " : "WIFI] ");
 
     _lcd.setCursor(0, 2);
     _lcd.print(_sm.menuIndex == 1 ? "> " : "  ");
-    _lcd.print("Net Mode : [");
-    _lcd.print(NVSManager::config.networkMode == NET_MODE_SIM ? "SIM]  " : "WIFI] ");
+    _lcd.print("Buzzer   : [");
+    _lcd.print(NVSManager::config.isMuted ? "OFF]  " : "ON ]  ");
 
     _lcd.setCursor(0, 3);
     _lcd.print(_sm.menuIndex == 2 ? "> " : "  ");
@@ -346,6 +355,21 @@ void ScreenManager::_drawCalMenu() {
     }
 }
 
+void ScreenManager::_drawTempCal() {
+    _lcd.setCursor(0, 0); _lcd.print("--- Temp Calib ---  ");
+    
+    _lcd.setCursor(0, 1); _lcd.print(" Offset : [");
+    _printPadded(NVSManager::tempOffset, 1, 5); _lcd.print("]  ");
+    
+    char buf[21];
+    snprintf(buf, sizeof(buf), " Current: %-5.1f", _sensor.tempC);
+    _lcd.setCursor(0, 2); _lcd.print(buf);
+    _lcd.print((char)223); // สัญลักษณ์องศา (°)
+    _lcd.print("C  ");
+    
+    _lcd.setCursor(0, 3); _lcd.print("   Click to Save    ");
+}
+
 
 // ==========================================
 // SYSTEM_INFO5
@@ -446,14 +470,20 @@ void ScreenManager::_drawCalFinish() {
     _lcd.setCursor(0, 0); 
     _lcd.print("--- Calibration --- ");
     
-    _lcd.setCursor(0, 1); 
-    _lcd.print("  Calibrate Finish! ");
-    
-    _lcd.setCursor(0, 2); 
-    _lcd.print("     Success!!!     ");
+    if (_sm.calibSuccess) {
+        _lcd.setCursor(0, 1); 
+        _lcd.print("  Calibrate Finish! ");
+        _lcd.setCursor(0, 2); 
+        _lcd.print("     Success!!!     ");
+    } else {
+        _lcd.setCursor(0, 1); 
+        _lcd.print("  Calibrate Failed! ");
+        _lcd.setCursor(0, 2); 
+        _lcd.print("    Math Error!!    ");
+    }
     
     _lcd.setCursor(0, 3); 
-    _lcd.print("                    ");
+    _lcd.print("   Please Wait...   ");
 }
 
 void ScreenManager::_drawCalCancelConfirm() {

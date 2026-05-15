@@ -38,6 +38,7 @@ private:
     void _drawThreshMenu();
     void _drawEditThresh();
     void _drawCalMenu();
+    void _drawTempCal();
     void _drawSystemInfo();
     void _drawCalmanual();
     void _drawEditCalManual();

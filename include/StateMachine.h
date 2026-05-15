@@ -23,6 +23,7 @@ enum class AppState {
     THRESH_MENU,
     EDIT_THRESH,
     CAL_MENU, 
+    TEMP_CAL,
     SYSTEM_INFO,
     CAL_MANUAL, 
     EDIT_CAL_MANUAL, 
@@ -65,6 +66,7 @@ public:
     float tmp_v_salt = 0.0f;
     float tmp_t_salt = 0.0f;
 
+    bool calibSuccess = false; // ตัวแปรบอกสถานะว่าคำนวณผ่านหรือไม่
     bool simLastSuccess  = false;
     int  simLastHttpCode = 0;
 
@@ -88,12 +90,12 @@ private:
     void _handleThreshMenu(ButtonEvent ev);
     void _handleEditThresh(ButtonEvent ev);
     void _handleCalMenu(ButtonEvent ev); 
+    void _handleTempCal(ButtonEvent ev);
     void _handleSystemInfo(ButtonEvent ev);
     void _handleCalManual(ButtonEvent ev, const SensorData& sensor);
     void _handleEditCalManual(ButtonEvent ev);
     void _handleCalDI(ButtonEvent ev, const SensorData& sensor);
     void _handleCalSalt(ButtonEvent ev, const SensorData& sensor);
-    void _handleCalFinish();
     void _handleCalCancelConfirm(ButtonEvent ev);
     void _handleSimStatus(ButtonEvent ev);
     void _handleSimSending(ButtonEvent ev);
