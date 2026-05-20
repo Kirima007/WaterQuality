@@ -15,8 +15,8 @@
     #define RGB_G 13
     #define RGB_B 12
 #else
-    #define RGB_R 12
-    #define RGB_G 13
+    #define RGB_R 13
+    #define RGB_G 12
     #define RGB_B 15
 #endif
 
@@ -29,8 +29,8 @@
 #define HTTP_PATH_CALIB_SALINITY "/api/calibrate/salinity"
 #define HTTP_PATH_CALIB_PH       "/api/calibrate/ph"
 #define HTTP_PATH_CALIB_O2       "/api/calibrate/o2"
-#define DEVICE_ID       7           
-#define FW_VERSION  "V1.2"     // Version ของเฟิร์มแวร์
+#define DEVICE_ID       99           
+#define FW_VERSION  "V1.3"     // Version ของเฟิร์มแวร์
 
 
 #define WIFI_SSID "BCK-WIFI"    // ชื่อ Hotspot ที่ให้ผู้ใช้ตั้งตาม

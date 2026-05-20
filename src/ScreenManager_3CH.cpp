@@ -306,7 +306,7 @@ void ScreenManager::_drawTempCal() {
 
 void ScreenManager::_drawCal1() {
     char buf[21];
-    const char* targets[] = { "Target: 1.413 mS/cm", "Target: 4.0 pH     ", "Target: 0.0 mg/L   " };
+    const char* targets[] = { "Target: 0.0 mS/cm", "Target: 4.0 pH     ", "Target: 0.0 mg/L   " };
     const char* name[]   = { "1.Calib EC          ", "1.Calib pH          ", "1.Calib DO          " };
     
     _lcd.setCursor(0, 0); _lcd.print(name[_sm.currentParam]); 

@@ -104,13 +104,13 @@ void SensorTask::taskEntry(void* param) {
             data.valEC    = SensorMath::calculateEC(data.voltEC, data.tempC, NVSManager::calibEC.alpha, NVSManager::calibEC.beta);
             data.valPPT   = SensorMath::calculate(data.voltEC, data.tempC, NVSManager::calibEC.alpha, NVSManager::calibEC.beta);
 
-            // --- READ pH (A1) ---
-            int16_t rawPH = readADSAvg(ads, 1, 10);
+            // --- READ pH (A2) ---
+            int16_t rawPH = readADSAvg(ads, 2, 10);
             data.voltPH   = ads.computeVolts(rawPH);
             data.valPH    = SensorMath::calculatePH(data.voltPH, data.tempC, NVSManager::calibPH.alpha, NVSManager::calibPH.beta);
 
-            // --- READ DO (A2) ---
-            int16_t rawDO = readADSAvg(ads, 2, 10);
+            // --- READ DO (A1) ---
+            int16_t rawDO = readADSAvg(ads, 1, 10);
             data.voltDO   = ads.computeVolts(rawDO);
             data.valDO    = SensorMath::calculateDO(data.voltDO, data.tempC, NVSManager::calibDO.alpha, NVSManager::calibDO.beta);
 #endif

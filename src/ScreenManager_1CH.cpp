@@ -445,7 +445,7 @@ void ScreenManager::_drawCal1() {
     _lcd.setCursor(0, 0);
     _lcd.print("1. Insert Water     "); 
     _lcd.setCursor(0, 1);
-    _lcd.print("Target: 1.413 us/cm ");
+    _lcd.print("Target: 0.0 us/cm ");
     _lcd.setCursor(0, 2);
     snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.voltEC, _sensor.tempC);
     _lcd.print(buf);

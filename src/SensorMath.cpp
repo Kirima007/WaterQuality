@@ -6,6 +6,11 @@
 // ==========================================
 // const float SensorMath::TARGET_PPT = 6.35f;
 
+// Helper ฟังก์ชันสำหรับคำนวณ DO Saturation ตามอุณหภูมิ (ลดการเขียนโค้ดซ้ำ)
+static float getSaturationDO(float tempC) {
+    return 14.46f - (0.38f * tempC) + (0.0054f * tempC * tempC);
+}
+
 float SensorMath::calcEC25(float volt, float tempC) {
     float ecBase = (19.47f * volt) - 0.008f;
     return ecBase / (1.0f + 0.01702f * (tempC - 25.0f));
@@ -23,8 +28,8 @@ float SensorMath::calcDOBase(float volt, float tempC) {
     float v0 = -0.032f;   // แรงดันที่ 0% DO
     float v100 = 1.365f; // แรงดันที่ 100% DO
     float percentDO = (volt - v0) / (v100 - v0);
-    percentDO = max(0.0f, percentDO);
-    float maxDO = 14.46f - (0.38f * tempC) + (0.0054f * tempC * tempC);
+    // percentDO = max(0.0f, percentDO); // ปลดล็อคให้แสดงค่า % ที่ติดลบได้เพื่อการตรวจเช็คสภาพเซ็นเซอร์
+    float maxDO = getSaturationDO(tempC);
     return percentDO * maxDO; 
 }
 
@@ -35,7 +40,7 @@ bool SensorMath::computeAlphaBeta(uint8_t currentParam, float v1, float t1,
     float target1 = 0, target2 = 0;
 
     if (currentParam == 0) {
-        target1 = 1.413f;
+        target1 = 0.0f;
         target2 = 12.88f;
         m1 = calcEC25(v1, t1);
         m2 = calcEC25(v2, t2);
@@ -46,12 +51,13 @@ bool SensorMath::computeAlphaBeta(uint8_t currentParam, float v1, float t1,
         m2 = calcPHBase(v2, t2);
     } else {
         target1 = 0.0f;
-        target2 = 8.0f; // Example target for DO
+        // เป้าหมาย Std2 แปรผันตามอุณหภูมิน้ำขณะคาลิเบรตจุดที่ 2 (t2)
+        target2 = getSaturationDO(t2);
         m1 = calcDOBase(v1, t1);
         m2 = calcDOBase(v2, t2);
     }
 
-    if (abs(m2 - m1) < 0.0001f) return false;
+    if (fabsf(m2 - m1) < 0.000001f) return false; // ใช้ fabsf สำหรับทศนิยม float ป้องกัน Bug จากการแปลง Type
 
     alphaOut = (target2 - target1) / (m2 - m1);
     betaOut  = target1 - (alphaOut * m1);
@@ -61,30 +67,28 @@ bool SensorMath::computeAlphaBeta(uint8_t currentParam, float v1, float t1,
 float SensorMath::calculate(float volt, float tempC, float alpha, float beta) {
     float ecFinal = calculateEC(volt, tempC, alpha, beta);
     
-    if (ecFinal <= 0.0f) {//กรองกรณี EC ติดลบหรือเป็นศูนย์ (ซึ่งไม่สมเหตุสมผล) ให้คืนค่า Salinity เป็น 0.0 ppt แทน
-        return 0.0f;
-    }
     // แปลงจาก EC (mS/cm) เป็น Salinity (PPT)
     float salinity = (0.4803f * ecFinal) + 0.1634f;
-    return max(0.0f, salinity);
+    // ปล่อยให้ Salinity คืนค่าติดลบได้เพื่อให้ผู้ใช้รู้ตัวว่าต้อง Calibrate
+    return salinity;
 }
 
 float SensorMath::calculateEC(float volt, float tempC, float alpha, float beta) {
     float ec25_current = calcEC25(volt, tempC);
     float ecFinal = (alpha * ec25_current) + beta;
-    return max(0.0f, ecFinal);
+    return ecFinal;
 }
 
 float SensorMath::calculatePH(float volt, float tempC, float alpha, float beta) {
     float phBase = calcPHBase(volt, tempC);
     float phFinal = (alpha * phBase) + beta;
-    return constrain(phFinal, 0.0f, 14.0f);
+    return constrain(phFinal, -2.0f, 16.0f); // ขยายขอบเขตให้กว้างขึ้น เพื่อให้เห็นระยะ Drift
 }
 
 float SensorMath::calculateDO(float volt, float tempC, float alpha, float beta) {
     float doBase = calcDOBase(volt, tempC);
     float doFinal = (alpha * doBase) + beta;
-    return max(0.0f, doFinal);
+    return doFinal;
 }
 
 bool SensorMath::captureStableValue(uint8_t currentParam, float &capturedVolt, float &capturedTemp) {
@@ -93,8 +97,11 @@ bool SensorMath::captureStableValue(uint8_t currentParam, float &capturedVolt, f
     float sumVolt = 0.0f, sumTemp = 0.0f;
     
     for (int i = 0; i < N; i++) {
-        SensorData s;
-        xQueuePeek(sensorQueue, &s, 0); 
+        SensorData s = {0}; // Initialize ป้องกันค่าขยะ
+        if (xQueuePeek(sensorQueue, &s, 0) != pdTRUE) {
+            return false; // ถ้าดึงค่าจากคิวไม่ได้ ถือว่าอ่านค่าไม่สำเร็จ (ป้องกันค่ามั่ว)
+        }
+        
         float v = 0;
 #if SENSOR_COUNT == 3
         if (currentParam == 0) v = s.voltEC;
