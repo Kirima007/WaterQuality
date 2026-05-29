@@ -145,9 +145,9 @@ void ScreenManager::_drawMainScreen() {
 
     String gpsStatus;
     if (_gps.serialError) {
-        gpsStatus = "SER_ERR";
+        gpsStatus = "ERR";
     } else if (_gps.valid) {
-        gpsStatus = "Fix " + String(_gps.satellites);
+        gpsStatus = "OK " + String(_gps.satellites);
     } else {
         gpsStatus = "Wait";
     }
@@ -421,20 +421,22 @@ void ScreenManager::_drawCalmanual() {
 
 void ScreenManager::_drawEditCalManual() {
     _lcd.setCursor(0, 0);
-    _lcd.print("--- Adjust Value ---");
-
-    _lcd.setCursor(0, 1);
     if (_sm.editingColor == 'A') {
-        _lcd.print("  Alpha (A) Multi.  ");
+        _lcd.print("- Alpha (A) Multi. -");
     } else {
-        _lcd.print("   Beta (B) Offset  ");
+        _lcd.print("-  Beta (B) Offset -");
     }
 
-    _lcd.setCursor(0, 2);
+    _lcd.setCursor(0, 1);
     float val = (_sm.editingColor == 'A') ? NVSManager::calibEC.alpha : NVSManager::calibEC.beta;
-    _lcd.print("      [");
+    _lcd.print(" Value  : [");
     _printPadded(val, 3, 6);
-    _lcd.print("]     ");
+    _lcd.print("] ");
+
+    _lcd.setCursor(0, 2);
+    _lcd.print(" Current: ");
+    _printPadded(_sensor.valPPT, 2, 5);
+    _lcd.print(" ppt ");
 
     _lcd.setCursor(0, 3);
     _lcd.print("  Click to Confirm  ");
