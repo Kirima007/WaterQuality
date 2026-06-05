@@ -29,7 +29,7 @@
 #define HTTP_PATH_CALIB_SALINITY "/api/calibrate/salinity"
 #define HTTP_PATH_CALIB_PH       "/api/calibrate/ph"
 #define HTTP_PATH_CALIB_O2       "/api/calibrate/o2"
-#define DEVICE_ID       14           
+#define DEVICE_ID       1           
 #define FW_VERSION  "V1.4"     // Version ของเฟิร์มแวร์
 
 

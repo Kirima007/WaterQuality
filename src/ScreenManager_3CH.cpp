@@ -3,6 +3,8 @@
 
 #if SENSOR_COUNT == 3
 
+static uint32_t lastGpsValidTime = 0;
+
 // ==========================================
 // Constructor
 // ==========================================
@@ -61,6 +63,10 @@ void ScreenManager::taskEntry(void* param) {
 void ScreenManager::_updateData() {
     xQueuePeek(sensorQueue, &_sensor, 0);
     xQueuePeek(gpsQueue,    &_gps,    0);
+
+    if (_gps.valid) {
+        lastGpsValidTime = millis();
+    }
 }
 
 void ScreenManager::_printPadded(float val, int decimals, int width) {
@@ -152,6 +158,8 @@ void ScreenManager::_drawMainScreen() {
         gpsStatus = "ERR";
     } else if (_gps.valid) {
         gpsStatus = "OK " + String(_gps.satellites);
+    } else if (millis() - lastGpsValidTime > 120000) {
+        gpsStatus = "NO";
     } else {
         gpsStatus = "Wait";
     }
@@ -410,7 +418,7 @@ void ScreenManager::_drawSimResult() {
         _lcd.setCursor(0, 1); _lcd.print(" Send Failed!  X    ");
         _lcd.setCursor(0, 2);
         char buf[21];
-        sprintf(buf, " HTTP: %-12d", _sm.simLastHttpCode);
+        sprintf(buf, " HTTP: %-5d Retry  ", _sm.simLastHttpCode);
         _lcd.print(buf);
     }
     _lcd.setCursor(0, 3); _lcd.print(" Click to go back   ");
