@@ -14,7 +14,7 @@ This system continuously monitors water quality metrics, displays data via an I2
 * **Hardware User Interface**: 20x4 Character LCD paired with a rotary encoder for navigation, calibration, and local configuration.
 * **On-Device Calibration**: Auto and manual calibration for alpha/beta multi-point correction, stored securely in Non-Volatile Storage (NVS).
 * **Over-The-Air (OTA) Updates**: Supports remote firmware updates via HTTP over Wi-Fi.
-* **Location Tracking**: Integrates Neo-6M GPS for geospatial data tagging.
+* **Location Tracking**: Integrates Neo-N8M GPS for geospatial data tagging.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ This system continuously monitors water quality metrics, displays data via an I2
 * DS18B20 One-Wire Temperature Sensor
 * Analog Sensors (EC, pH, DO)
 * SIM800L GSM/GPRS Module
-* Neo-6M GPS Module
+* Neo-N8M GPS Module
 * Buzzer & RGB LED for alarm states
 
 ### Software
@@ -60,7 +60,7 @@ This system continuously monitors water quality metrics, displays data via an I2
 Core system parameters, network credentials, and API endpoints are defined in `src/config.h`. Modify this file before compiling for production deployment:
 
 ```c
-#define HTTP_HOST       "161.246.157.210"
+#define HTTP_HOST       "xxx.xxx.xxx.xxx"
 #define HTTP_PATH       "/api/data"
 #define WIFI_SSID       "BCK-WIFI"
 #define WIFI_PASS       "123456789"
