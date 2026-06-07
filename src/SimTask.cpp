@@ -196,7 +196,7 @@ void SimTask::taskEntry(void* param) {
 // ==========================================
 String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonDocument doc;
-    doc["id"]       = DEVICE_ID;
+    doc["id"]       = NVSManager::config.deviceId;
     doc["temp"]     = serialized(String(sensor.tempC, 1));
 
     if (_reqSensorIdx == 0) {
@@ -224,7 +224,7 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
 // ==========================================
 String SimTask::_buildCalibJson() {
     JsonDocument doc;
-    doc["id"]     = DEVICE_ID;
+    doc["id"]     = NVSManager::config.deviceId;
     String payload;
     serializeJson(doc, payload);
     return payload;

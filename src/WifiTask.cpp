@@ -259,7 +259,7 @@ void WifiTask::taskEntry(void* param) {
 // ==========================================
 String WifiTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonDocument doc;
-    doc["id"]       = DEVICE_ID;
+    doc["id"]       = NVSManager::config.deviceId;
     doc["temp"]     = serialized(String(sensor.tempC, 1));
 
     if (_reqSensorIdx == 0) {
@@ -287,7 +287,7 @@ String WifiTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
 // ==========================================
 String WifiTask::_buildCalibJson() {
     JsonDocument doc;
-    doc["id"]     = DEVICE_ID;
+    doc["id"]     = NVSManager::config.deviceId;
     String payload;
     serializeJson(doc, payload);
     return payload;

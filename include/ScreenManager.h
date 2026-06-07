@@ -53,6 +53,7 @@ private:
     void _drawOtaChecking();
     void _drawOtaResult();
     void _drawOtaUpdating();
+    void _drawEditDeviceId();
 
 #if SENSOR_COUNT == 3
     // วาดหน้าจอที่มีเฉพาะในรุ่น 3 หัว

@@ -18,6 +18,7 @@ struct ThreshData {
 struct SystemConfig {
     uint8_t networkMode = 0;        // 0 = SIM, 1 = WIFI
     bool isMuted = false;           // true = ปิดเสียง (Mute), false = เปิดเสียง
+    uint16_t deviceId = 0;          // Device ID ปัจจุบัน
 };
 class NVSManager {
 public:
@@ -84,4 +85,5 @@ private:
     static const char* KEY_NET_MODE;
     static const char* KEY_IS_MUTED;
     static const char* KEY_TEMP_OFF;
+    static const char* KEY_DEV_ID;
 };

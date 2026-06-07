@@ -37,7 +37,8 @@ enum class AppState {
     SYSTEM_SETUP,
     OTA_CHECKING,
     OTA_RESULT,
-    OTA_UPDATING
+    OTA_UPDATING,
+    EDIT_DEVICE_ID
 };
 
 class StateMachine {
@@ -77,6 +78,7 @@ public:
     String otaLatestVersion = "V1.5";
     int otaProgress = 45;
     String otaDownloadUrl = "";
+    uint16_t tmpDeviceId = 0;
 
     // SimTask เรียกเมื่อส่งเสร็จ
     void onSimSendComplete(bool success, int httpCode);
@@ -116,6 +118,7 @@ private:
     void _handleOtaChecking(ButtonEvent ev);
     void _handleOtaResult(ButtonEvent ev);
     void _handleOtaUpdating(ButtonEvent ev);
+    void _handleEditDeviceId(ButtonEvent ev);
 
 #if SENSOR_COUNT == 3
     // Handler ที่มีเฉพาะรุ่น 3 หัว

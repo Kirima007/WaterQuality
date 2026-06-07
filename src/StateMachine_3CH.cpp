@@ -72,6 +72,7 @@ void StateMachine::handleEvent(ButtonEvent ev) {
         case AppState::OTA_CHECKING:        _handleOtaChecking(ev);             break;
         case AppState::OTA_RESULT:          _handleOtaResult(ev);               break;
         case AppState::OTA_UPDATING:        _handleOtaUpdating(ev);             break;
+        case AppState::EDIT_DEVICE_ID:      _handleEditDeviceId(ev);            break;
         default: break;
     }
 }
@@ -340,9 +341,30 @@ void StateMachine::_handleSystemInfo(ButtonEvent ev) {
         delay(500); // รอให้เสียงเล่นและบันทึกเสร็จ
         ESP.restart();
     } else if (ev == ButtonEvent::SHORT_PRESS) {
-        requestSound(SoundEvent::BACK);
-        menuIndex = 8;
-        _goTo(AppState::MAIN_MENU);
+        ButtonEvent nextEv;
+        int clicks = 1;
+        uint32_t startWait = millis();
+        
+        // รอรับคลิกที่ 2 และ 3 ภายในระยะเวลาไม่เกิน 500ms
+        while(millis() - startWait < 500) {
+            if (xQueueReceive(inputQueue, &nextEv, pdMS_TO_TICKS(10)) == pdTRUE) {
+                if (nextEv == ButtonEvent::SHORT_PRESS) {
+                    clicks++;
+                    startWait = millis(); 
+                    if (clicks >= 3) break;
+                }
+            }
+        }
+        
+        if (clicks >= 3) {
+            tmpDeviceId = NVSManager::config.deviceId;
+            requestSound(SoundEvent::SELECT);
+            _goTo(AppState::EDIT_DEVICE_ID);
+        } else {
+            requestSound(SoundEvent::BACK);
+            menuIndex = 8;
+            _goTo(AppState::MAIN_MENU);
+        }
     }
 }
 
@@ -575,6 +597,38 @@ void StateMachine::onOtaCheckComplete(bool success) {
     if (success) requestSound(SoundEvent::SUCCESS);
     else requestSound(SoundEvent::BACK);
     _goTo(AppState::OTA_RESULT);
+}
+
+// ==========================================
+// EDIT_DEVICE_ID
+// ==========================================
+void StateMachine::_handleEditDeviceId(ButtonEvent ev) {
+    if (ev == ButtonEvent::ROTATE_CW || ev == ButtonEvent::ROTATE_CCW) {
+        requestSound(SoundEvent::SCROLL);
+        static uint32_t lastRotMs = 0;
+        static int fastCount = 0;
+        uint32_t now = millis();
+        int step = (ev == ButtonEvent::ROTATE_CW) ? 1 : -1;
+        
+        if (now - lastRotMs < 150) {
+            fastCount++;
+            if (fastCount > 6) step *= 10;
+            else if (fastCount > 3) step *= 5;
+        } else { fastCount = 0; }
+        lastRotMs = now;
+        int newId = (int)tmpDeviceId + step;
+        if (newId > 65535) newId = 65535;
+        if (newId < 0) newId = 0;
+        tmpDeviceId = (uint16_t)newId;
+    } else if (ev == ButtonEvent::SHORT_PRESS) {
+        requestSound(SoundEvent::SUCCESS);
+        NVSManager::config.deviceId = tmpDeviceId;
+        NVSManager::saveConfig();
+        _goTo(AppState::SYSTEM_INFO);
+    } else if (ev == ButtonEvent::LONG_PRESS) {
+        requestSound(SoundEvent::BACK);
+        _goTo(AppState::SYSTEM_INFO);
+    }
 }
 
 #endif

@@ -59,6 +59,7 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::OTA_CHECKING:        self->_drawOtaChecking();       break;
             case AppState::OTA_RESULT:          self->_drawOtaResult();         break;
             case AppState::OTA_UPDATING:        self->_drawOtaUpdating();       break;
+            case AppState::EDIT_DEVICE_ID:      self->_drawEditDeviceId();      break;
         }
 
         vTaskDelay(pdMS_TO_TICKS(DISPLAY_TASK_DELAY_MS));
@@ -395,7 +396,7 @@ void ScreenManager::_drawSystemInfo() {
 
     // บรรทัด 2: Device ID 
     _lcd.setCursor(0, 1);
-    snprintf(buf, sizeof(buf), "Device ID : %-9d", DEVICE_ID);
+    snprintf(buf, sizeof(buf), "Device ID : %-9d", NVSManager::config.deviceId);
     _lcd.print(buf);
 
     // บรรทัด 3: Firmware Version (ดึงจาก #define)
@@ -664,6 +665,15 @@ void ScreenManager::_drawOtaUpdating() {
         if (i < bars) _lcd.print((char)0xFF); // พิมพ์บล็อกสี่เหลี่ยมทึบ
         else _lcd.print(".");
     }
+}
+
+void ScreenManager::_drawEditDeviceId() {
+    _lcd.setCursor(0, 0); _lcd.print("--- Set Device ID --");
+    char buf[21];
+    snprintf(buf, sizeof(buf), " ID : [%-5d]       ", _sm.tmpDeviceId);
+    _lcd.setCursor(0, 1); _lcd.print(buf);
+    _lcd.setCursor(0, 2); _lcd.print("                    ");
+    _lcd.setCursor(0, 3); _lcd.print("  Click to Confirm  ");
 }
 
 #endif

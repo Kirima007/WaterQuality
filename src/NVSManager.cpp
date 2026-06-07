@@ -1,4 +1,5 @@
 #include "NVSManager.h"
+#include "config.h"
 
 // ==========================================
 // Static Member Definitions
@@ -53,6 +54,7 @@ const char* NVSManager::KEY_THRESH_R = "th_r";
 const char* NVSManager::KEY_NET_MODE  = "net_mode"; // ← เพิ่ม
 const char* NVSManager::KEY_IS_MUTED  = "is_muted"; // ← เพิ่ม
 const char* NVSManager::KEY_TEMP_OFF  = "tmp_off";
+const char* NVSManager::KEY_DEV_ID    = "dev_id";
 
 
 // ==========================================
@@ -99,6 +101,7 @@ void NVSManager::load() {
     // โหลด System Config
     config.networkMode = _prefs.getUInt(KEY_NET_MODE, 0);
     config.isMuted = _prefs.getBool(KEY_IS_MUTED, false);
+    config.deviceId = _prefs.getUShort(KEY_DEV_ID, DEVICE_ID);
 
     // โหลด Temp Offset
     tempOffset = _prefs.getFloat(KEY_TEMP_OFF, 0.0f);
@@ -183,18 +186,21 @@ void NVSManager::saveConfig() {
     _prefs.begin(NAMESPACE, false);
     _prefs.putUInt(KEY_NET_MODE, config.networkMode);
     _prefs.putBool(KEY_IS_MUTED, config.isMuted);
+    _prefs.putUShort(KEY_DEV_ID, config.deviceId);
     _prefs.end();
 }
 
 // ==========================================
-// Reset — คืนค่า default ทั้งหมด
+// Reset — คืนค่า default ทั้งหมด (ยกเว้น Calib, Temp Offset และ Device ID)
 // ==========================================
 void NVSManager::reset() {
-    // คืนค่า struct กลับ default
-    calibEC = CalibData{};
+    // 1. เก็บค่า Calibration และ Device ID เอาไว้ก่อน
+    CalibData savedCalibEC = calibEC;
 #if SENSOR_COUNT == 3
-    calibPH = CalibData{};
-    calibDO = CalibData{};
+    CalibData savedCalibPH = calibPH;
+    CalibData savedCalibDO = calibDO;
+    
+    // คืนค่า Threshold กลับเป็น Default
     threshEC = ThreshData{};
     threshPH = ThreshData{};
     threshDO = ThreshData{};
@@ -202,11 +208,27 @@ void NVSManager::reset() {
     thresh = ThreshData{};
 #endif
 
+    uint16_t savedDeviceId = config.deviceId;
+    float savedTempOffset = tempOffset;
+
     config = SystemConfig{}; // <-- เผื่ออยากให้ networkMode กลับเป็น 0 ด้วย
-    tempOffset = 0.0f;
 
     // ลบทุกค่าใน namespace นี้ออกจาก Flash
     _prefs.begin(NAMESPACE, false);
     _prefs.clear();
     _prefs.end();
+
+    // 2. คืนค่าที่ตั้งใจเก็บรักษาไว้
+    calibEC = savedCalibEC;
+#if SENSOR_COUNT == 3
+    calibPH = savedCalibPH;
+    calibDO = savedCalibDO;
+#endif
+    config.deviceId = savedDeviceId;
+    tempOffset = savedTempOffset;
+
+    // 3. เซฟค่าทั้งหมดกลับลง Flash ทันที
+    saveCalib();
+    saveThresh();
+    saveConfig();
 }
