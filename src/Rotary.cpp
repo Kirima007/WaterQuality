@@ -37,7 +37,7 @@ void RotaryInput::taskEntry(void* param) {
         self->_handleRotation(currentCount);
         self->_handleButton();
 
-        self->_lastEncoderCount = currentCount;
+        // ปล่อยให้ _handleRotation ควบคุม _lastEncoderCount เอง เพื่อไม่ให้เสียเศษทิ้งเวลาหมุนไวๆ
 
         vTaskDelay(pdMS_TO_TICKS(ROTARY_TASK_DELAY_MS));
     }
@@ -47,24 +47,21 @@ void RotaryInput::taskEntry(void* param) {
 // Private: จัดการการหมุน Encoder
 // ==========================================
 void RotaryInput::_handleRotation(long currentCount) {
-    // ถ้าไม่มีการหมุน ให้จบการทำงาน
-    if (currentCount == _lastEncoderCount) return; 
+    long diff = currentCount - _lastEncoderCount;
 
-    // ✅ ดักจับเฉพาะ "เลขคู่" (จังหวะขอบขาลง / บิดออกจากล็อค)
-    if (currentCount % 2 == 0) {
-        ButtonEvent ev;
-
-        if (currentCount > _lastEncoderCount) {
-            ev = ButtonEvent::ROTATE_CW;   // หมุนขวา
-        } else {
-            ev = ButtonEvent::ROTATE_CCW;  // หมุนซ้าย
+    // 1 ล็อคของ Encoder แบบ Half Quad คือ 2 count
+    if (abs(diff) >= 2) {
+        int clicks = diff / 2; // คำนวณจำนวนคลิกที่หมุนได้จริงในช่วง 20ms
+        ButtonEvent ev = (clicks > 0) ? ButtonEvent::ROTATE_CW : ButtonEvent::ROTATE_CCW;
+        
+        int eventsToSend = abs(clicks);
+        for (int i = 0; i < eventsToSend; i++) {
+            xQueueSend(inputQueue, &ev, 0); // โยน event เข้าระบบตามจำนวนที่หมุนจริง
         }
-
-        // ส่ง event เข้า Queue และเล่นเสียง
-        xQueueSend(inputQueue, &ev, 0);
+        
+        // อัปเดตค่า _lastEncoderCount เฉพาะส่วนที่นับเป็นคลิกแล้ว (เพื่อเก็บเศษติ่งไว้คำนวณรอบถัดไป)
+        _lastEncoderCount += (clicks * 2);
     }
-    
-    // หมายเหตุ: จังหวะเลขคู่ (เข้าล็อค) โค้ดจะไม่ส่ง Event ทำให้ไม่เกิดอาการเบิ้ล
 }
 
 // ==========================================

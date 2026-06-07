@@ -19,11 +19,16 @@ public:
     // สั่งให้ส่งข้อมูล (เรียกจาก StateMachine)
     static void requestSend(uint8_t sensorIndex = 0);
     static void requestSendCalib(uint8_t sensorIndex = 0);
+    static void requestCheckOta();
+    static void requestStartOta(const String& url);
 
 private:
     static volatile bool _connected;
     static volatile bool _sendRequested;
     static volatile bool _sendCalibRequested;
+    static volatile bool _checkOtaRequested;
+    static volatile bool _startOtaRequested;
+    static String _otaUrl;
     static volatile uint8_t _reqSensorIdx;
     static volatile uint8_t _reqCalibIdx;
     static volatile int  _signalQuality;

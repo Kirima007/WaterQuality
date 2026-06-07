@@ -35,6 +35,9 @@ enum class AppState {
     SIM_RESULT,
     NETWORK_STATUS,
     SYSTEM_SETUP,
+    OTA_CHECKING,
+    OTA_RESULT,
+    OTA_UPDATING
 };
 
 class StateMachine {
@@ -70,8 +73,16 @@ public:
     bool simLastSuccess  = false;
     int  simLastHttpCode = 0;
 
+    bool otaHasUpdate = true;
+    String otaLatestVersion = "V1.5";
+    int otaProgress = 45;
+    String otaDownloadUrl = "";
+
     // SimTask เรียกเมื่อส่งเสร็จ
     void onSimSendComplete(bool success, int httpCode);
+    
+    // WifiTask/SimTask เรียกเมื่อเช็คเวอร์ชันเสร็จ
+    void onOtaCheckComplete(bool success);
 
 private:
     AppState _current;
@@ -102,6 +113,9 @@ private:
     void _handleSimResult(ButtonEvent ev);
     void _handleNetworkStatus(ButtonEvent ev); 
     void _handleSystemSetup(ButtonEvent ev); 
+    void _handleOtaChecking(ButtonEvent ev);
+    void _handleOtaResult(ButtonEvent ev);
+    void _handleOtaUpdating(ButtonEvent ev);
 
 #if SENSOR_COUNT == 3
     // Handler ที่มีเฉพาะรุ่น 3 หัว

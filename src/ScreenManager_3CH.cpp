@@ -53,6 +53,9 @@ void ScreenManager::taskEntry(void* param) {
             case AppState::SIM_RESULT:           self->_drawSimResult();         break;
             case AppState::NETWORK_STATUS:       self->_drawNetworkStatus();     break;
             case AppState::SYSTEM_SETUP:         self->_drawSystemSetup();       break;
+            case AppState::OTA_CHECKING:         self->_drawOtaChecking();       break;
+            case AppState::OTA_RESULT:           self->_drawOtaResult();         break;
+            case AppState::OTA_UPDATING:         self->_drawOtaUpdating();       break;
             default: break;
         }
 
@@ -173,7 +176,7 @@ void ScreenManager::_drawMainScreen() {
 }
 
 void ScreenManager::_drawMainMenu() {
-    const int totalItems = 8; // ลบ Back ออก
+    const int totalItems = 9; // ลบ Back ออก
     const char* items[totalItems] = { 
         "Monitor Data",
         "Network Status",
@@ -182,6 +185,7 @@ void ScreenManager::_drawMainMenu() {
         "Sensor Calibrate",
         "Temp Calibrate",
         "Alarm Limits",
+        "Firmware Update",
         "System Info" 
     };
     int startIdx = _sm.menuIndex <= 1 ? 0 : min(_sm.menuIndex - 1, totalItems - 4); 
@@ -470,6 +474,45 @@ void ScreenManager::_drawSystemInfo() {
     _lcd.setCursor(0, 1); snprintf(buf, sizeof(buf), "Dev ID  : %-9d", DEVICE_ID); _lcd.print(buf);
     _lcd.setCursor(0, 2); snprintf(buf, sizeof(buf), "Firmware: %-10.10s", FW_VERSION); _lcd.print(buf);
     _lcd.setCursor(0, 3); _lcd.print("By AIOT LAB (KMITL) "); 
+}
+
+// ==========================================
+// OTA UPDATE SCREENS
+// ==========================================
+void ScreenManager::_drawOtaChecking() {
+    _lcd.setCursor(0, 0); _lcd.print("--- FW Update ------");
+    _lcd.setCursor(0, 1); _lcd.print("Connecting server...");
+    _lcd.setCursor(0, 2); _lcd.print("Checking version... ");
+    _lcd.setCursor(0, 3); _lcd.print("Please wait...      ");
+}
+
+void ScreenManager::_drawOtaResult() {
+    _lcd.setCursor(0, 0); _lcd.print("--- FW Update ------");
+    if (_sm.otaHasUpdate) {
+        _lcd.setCursor(0, 1); _lcd.print("New: "); _lcd.print(_sm.otaLatestVersion);
+        _lcd.setCursor(0, 2); _lcd.print("Cur: "); _lcd.print(FW_VERSION);
+        _lcd.setCursor(0, 3); _lcd.print("Hold 10s to Update! ");
+    } else {
+        _lcd.setCursor(0, 1); _lcd.print("System is up to date");
+        _lcd.setCursor(0, 2); _lcd.print("Cur: "); _lcd.print(FW_VERSION);
+        _lcd.setCursor(0, 3); _lcd.print("Click to go back    ");
+    }
+}
+
+void ScreenManager::_drawOtaUpdating() {
+    _lcd.setCursor(0, 0); _lcd.print("--- Downloading ----");
+    _lcd.setCursor(0, 1); _lcd.print("DO NOT POWER OFF!   ");
+    
+    char buf[21];
+    snprintf(buf, sizeof(buf), "Progress: %d%%       ", _sm.otaProgress);
+    _lcd.setCursor(0, 2); _lcd.print(buf);
+
+    _lcd.setCursor(0, 3);
+    int bars = (_sm.otaProgress * 20) / 100;
+    for (int i = 0; i < 20; i++) {
+        if (i < bars) _lcd.print((char)0xFF); // พิมพ์บล็อกสี่เหลี่ยมทึบ
+        else _lcd.print(".");
+    }
 }
 
 #endif

@@ -71,6 +71,9 @@ void StateMachine::handleEvent(ButtonEvent ev) {
         case AppState::SIM_RESULT:          _handleSimResult(ev);               break;
         case AppState::NETWORK_STATUS:      _handleNetworkStatus(ev);           break;
         case AppState::SYSTEM_SETUP:        _handleSystemSetup(ev);             break;
+        case AppState::OTA_CHECKING:        _handleOtaChecking(ev);             break;
+        case AppState::OTA_RESULT:          _handleOtaResult(ev);               break;
+        case AppState::OTA_UPDATING:        _handleOtaUpdating(ev);             break;
         default: break;
     }
 }
@@ -100,10 +103,10 @@ void StateMachine::_handleMainScreen(ButtonEvent ev) {
 // ==========================================
 void StateMachine::_handleMainMenu(ButtonEvent ev) {
     if (ev == ButtonEvent::ROTATE_CW) {
-        menuIndex = (menuIndex + 1) % 8;
+        menuIndex = (menuIndex + 1) % 9;
         requestSound(SoundEvent::SCROLL);
     } else if (ev == ButtonEvent::ROTATE_CCW) {
-        menuIndex = (menuIndex - 1 + 8) % 8;
+        menuIndex = (menuIndex - 1 + 9) % 9;
         requestSound(SoundEvent::SCROLL);
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         switch (menuIndex) {
@@ -119,8 +122,14 @@ void StateMachine::_handleMainMenu(ButtonEvent ev) {
             case 5: 
                 menuIndex = 0;
                 _goTo(AppState::THRESH_MENU);         requestSound(SoundEvent::SELECT); break;
-            case 6: _goTo(AppState::SYSTEM_INFO);     requestSound(SoundEvent::SELECT); break;
-            case 7: _goTo(AppState::MAIN_SCREEN);     requestSound(SoundEvent::BACK);   break;
+            case 6: 
+                if (NVSManager::config.networkMode == NET_MODE_WIFI) {
+                    WifiTask::requestCheckOta();
+                } // else { SimTask::requestCheckOta(); } รอทำของ SIM ในสเต็ปถัดไป
+                _goTo(AppState::OTA_CHECKING);    
+                requestSound(SoundEvent::SELECT); break;
+            case 7: _goTo(AppState::SYSTEM_INFO);     requestSound(SoundEvent::SELECT); break;
+            case 8: _goTo(AppState::MAIN_SCREEN);     requestSound(SoundEvent::BACK);   break;
         }
     }
 }
@@ -186,29 +195,42 @@ void StateMachine::_handleThreshMenu(ButtonEvent ev) {
 void StateMachine::_handleEditThresh(ButtonEvent ev) {
     if (ev == ButtonEvent::ROTATE_CW || ev == ButtonEvent::ROTATE_CCW) {
         requestSound(SoundEvent::SCROLL);
-        float step = (ev == ButtonEvent::ROTATE_CW) ? 0.5f : -0.5f;
+        
+        static uint32_t lastRotMs = 0;
+        static int fastCount = 0;
+        uint32_t now = millis();
+
+        float step = (ev == ButtonEvent::ROTATE_CW) ? 0.1f : -0.1f;
+        
+        if (now - lastRotMs < 150) {  // ถ้าหมุนติดๆ กันเร็วกว่า 150ms
+            fastCount++;
+            if (fastCount > 2) step *= 10.0f; // หมุนเร็วให้ก้าวกระโดดทีละ 1.0
+        } else {
+            fastCount = 0;
+        }
+        lastRotMs = now;
 
         if (editingColor == 'G') {
             NVSManager::thresh.green += step;
             NVSManager::thresh.green  = constrain(
                 NVSManager::thresh.green, 
                 0.0f, 
-                NVSManager::thresh.yellow - 0.5f
+                NVSManager::thresh.yellow - 0.1f
             );
         } 
         else if (editingColor == 'Y') {
             NVSManager::thresh.yellow += step;
             NVSManager::thresh.yellow  = constrain(
                 NVSManager::thresh.yellow,
-                NVSManager::thresh.green + 0.5f,
-                NVSManager::thresh.red - 0.5f
+                NVSManager::thresh.green + 0.1f,
+                NVSManager::thresh.red - 0.1f
             );
         }
         else { // กรณีแก้สีแดง ('R')
             NVSManager::thresh.red += step;
             NVSManager::thresh.red  = constrain(
                 NVSManager::thresh.red,
-                NVSManager::thresh.yellow + 0.5f,
+                NVSManager::thresh.yellow + 0.1f,
                 100.0f
             );
         }
@@ -259,7 +281,19 @@ void StateMachine::_handleCalMenu(ButtonEvent ev) {
 void StateMachine::_handleTempCal(ButtonEvent ev) {
     if (ev == ButtonEvent::ROTATE_CW || ev == ButtonEvent::ROTATE_CCW) {
         requestSound(SoundEvent::SCROLL);
+
+        static uint32_t lastRotMs = 0;
+        static int fastCount = 0;
+        uint32_t now = millis();
+
         float step = (ev == ButtonEvent::ROTATE_CW) ? 0.1f : -0.1f;
+        
+        if (now - lastRotMs < 150) {
+            fastCount++;
+            if (fastCount > 2) step *= 10.0f; // ก้าวกระโดดทีละ 1.0
+        } else { fastCount = 0; }
+        lastRotMs = now;
+
         NVSManager::tempOffset += step;
         NVSManager::tempOffset = constrain(NVSManager::tempOffset, -10.0f, 10.0f);
     } else if (ev == ButtonEvent::SHORT_PRESS) {
@@ -278,7 +312,7 @@ void StateMachine::_handleSystemInfo(ButtonEvent ev) {
         ESP.restart();
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         requestSound(SoundEvent::BACK);
-        menuIndex = 6;
+        menuIndex = 7;
         _goTo(AppState::MAIN_MENU);
     }
 }
@@ -328,8 +362,19 @@ void StateMachine::_handleEditCalManual(ButtonEvent ev) {
     if (ev == ButtonEvent::ROTATE_CW || ev == ButtonEvent::ROTATE_CCW) {
         requestSound(SoundEvent::SCROLL);
         
+        static uint32_t lastRotMs = 0;
+        static int fastCount = 0;
+        uint32_t now = millis();
+
         // ความละเอียดทีละ 0.001 (แบบ Manual Calibrate ของรุ่นพี่)
         float step = (ev == ButtonEvent::ROTATE_CW) ? 0.001f : -0.001f;
+
+        if (now - lastRotMs < 150) {
+            fastCount++;
+            if (fastCount > 6) step *= 100.0f; // หมุนเร็วจัด! ก้าวกระโดดทีละ 0.100
+            else if (fastCount > 2) step *= 10.0f; // หมุนเร็ว ก้าวกระโดดทีละ 0.010
+        } else { fastCount = 0; }
+        lastRotMs = now;
 
         if (editingColor == 'A') {
             NVSManager::calibEC.alpha += step;
@@ -511,5 +556,46 @@ void StateMachine::_handleNetworkStatus(ButtonEvent ev) {
     
 }
 
+ // ==========================================
+ // OTA UPDATE HANDLERS
+ // ==========================================
+ void StateMachine::_handleOtaChecking(ButtonEvent ev) {
+    if (ev == ButtonEvent::SHORT_PRESS) {
+        requestSound(SoundEvent::BACK);
+        menuIndex = 6;
+        _goTo(AppState::MAIN_MENU);
+    } else if (ev == ButtonEvent::LONG_PRESS) {
+        // TEST HOOK: แอบให้กดค้างเพื่อข้ามไปหน้า RESULT ไว้ดู UI 
+        requestSound(SoundEvent::SUCCESS);
+        _goTo(AppState::OTA_RESULT);
+    }
+ }
+ 
+ void StateMachine::_handleOtaResult(ButtonEvent ev) {
+    if (ev == ButtonEvent::SUPER_LONG_PRESS && otaHasUpdate) {
+        if (NVSManager::config.networkMode == NET_MODE_SIM) {
+            requestSound(SoundEvent::BACK); // ยังไม่ให้ SIM อัปเดตไฟล์ใหญ่
+        } else {
+            requestSound(SoundEvent::SUCCESS);
+            otaProgress = 0;
+            WifiTask::requestStartOta(otaDownloadUrl);
+            _goTo(AppState::OTA_UPDATING);
+        }
+    } else if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
+        requestSound(SoundEvent::BACK);
+        menuIndex = 6;
+        _goTo(AppState::MAIN_MENU);
+    }
+ }
+ 
+ void StateMachine::_handleOtaUpdating(ButtonEvent ev) {
+    // บล็อคไม่ให้ทำอะไรเลยระหว่าง Update จนกว่าจะเสร็จแล้วเครื่องรีสตาร์ทเอง
+ }
+
+void StateMachine::onOtaCheckComplete(bool success) {
+    if (success) requestSound(SoundEvent::SUCCESS);
+    else requestSound(SoundEvent::BACK);
+    _goTo(AppState::OTA_RESULT);
+}
 
 #endif

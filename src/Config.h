@@ -29,8 +29,9 @@
 #define HTTP_PATH_CALIB_SALINITY "/api/calibrate/salinity"
 #define HTTP_PATH_CALIB_PH       "/api/calibrate/ph"
 #define HTTP_PATH_CALIB_O2       "/api/calibrate/o2"
-#define DEVICE_ID       1           
-#define FW_VERSION  "V1.4"     // Version ของเฟิร์มแวร์
+#define HTTP_PATH_OTA_VERSION    "/api/fw/version.json" // Path สำหรับเช็คอัปเดต OTA
+#define DEVICE_ID       99           
+#define FW_VERSION  "V1.5A"     // Version ของเฟิร์มแวร์
 
 
 #define WIFI_SSID "BCK-WIFI"    // ชื่อ Hotspot ที่ให้ผู้ใช้ตั้งตาม

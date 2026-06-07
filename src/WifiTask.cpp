@@ -5,6 +5,7 @@
 #include <WiFiClient.h>
 #include <ArduinoHttpClient.h>
 #include <ArduinoJson.h>
+#include <Update.h>
 
 // ==========================================
 // Static Members
@@ -12,6 +13,9 @@
 volatile bool WifiTask::_connected          = false;
 volatile bool WifiTask::_sendRequested      = false;
 volatile bool WifiTask::_sendCalibRequested = false;
+volatile bool WifiTask::_checkOtaRequested  = false;
+volatile bool WifiTask::_startOtaRequested  = false;
+String        WifiTask::_otaUrl             = "";
 volatile uint8_t WifiTask::_reqSensorIdx    = 0;
 volatile uint8_t WifiTask::_reqCalibIdx     = 0;
 volatile int  WifiTask::_signalQuality      = 0;
@@ -25,6 +29,15 @@ void WifiTask::requestSend(uint8_t sensorIndex) {
 void WifiTask::requestSendCalib(uint8_t sensorIndex) { 
     _reqCalibIdx = sensorIndex;
     _sendCalibRequested = true; 
+}
+
+void WifiTask::requestCheckOta() {
+    _checkOtaRequested = true;
+}
+
+void WifiTask::requestStartOta(const String& url) {
+    _otaUrl = url;
+    _startOtaRequested = true;
 }
 
 // ==========================================
@@ -140,6 +153,100 @@ void WifiTask::taskEntry(void* param) {
                 else if (_reqCalibIdx == 2) path = HTTP_PATH_CALIB_O2;
 
                 _doPost(path, payload, sm);
+            }
+        }
+
+        // --- 5. ตรวจสอบคำสั่งเช็คเวอร์ชัน OTA ---
+        if (_checkOtaRequested) {
+            _checkOtaRequested = false;
+
+            if (!_connected) {
+                sm->onOtaCheckComplete(false);
+            } else {
+                WiFiClient wifiClient; 
+                HttpClient http(wifiClient, HTTP_HOST, HTTP_PORT); 
+                http.setTimeout(5000); 
+
+                http.beginRequest();
+                http.get(HTTP_PATH_OTA_VERSION);
+                http.sendHeader("Accept", "application/json");
+                http.sendHeader("Connection", "close");
+                http.endRequest();
+
+                int httpCode = http.responseStatusCode();
+                bool success = false;
+
+                if (httpCode >= 200 && httpCode < 300) {
+                    String payload = http.responseBody();
+                    JsonDocument doc;
+                    DeserializationError error = deserializeJson(doc, payload);
+                    
+                    if (!error) {
+                        String latestVer = doc["latest_version"].as<String>();
+                        sm->otaLatestVersion = latestVer;
+                        sm->otaDownloadUrl   = doc["firmware_url"].as<String>();
+                        // ถ้าเวอร์ชันจากเว็บ ไม่ตรงกับที่มีอยู่ในเครื่อง = มีอัปเดตใหม่
+                        sm->otaHasUpdate = (latestVer != String(FW_VERSION));
+                        success = true;
+                    }
+                } else {
+                    http.responseBody(); // เคลียร์ข้อความตอบกลับทิ้ง
+                }
+
+                http.stop();
+                wifiClient.stop();
+                
+                sm->onOtaCheckComplete(success);
+            }
+        }
+
+        // --- 6. ตรวจสอบคำสั่งเริ่มดาวน์โหลด OTA ---
+        if (_startOtaRequested) {
+            _startOtaRequested = false;
+            if (_connected) {
+                // แยกเฉพาะ Path ออกจาก URL เต็ม 
+                // (สมมติ http://161.246.157.210/api/fw/firmware_v1_5.bin -> เอาแค่ /api/fw/...)
+                int pathIndex = _otaUrl.indexOf("/", 7);
+                String path = _otaUrl.substring(pathIndex);
+
+                WiFiClient wifiClient;
+                HttpClient http(wifiClient, HTTP_HOST, HTTP_PORT);
+
+                http.beginRequest();
+                http.get(path);
+                http.endRequest();
+
+                int httpCode = http.responseStatusCode();
+
+                if (httpCode == 200) {
+                    int contentLength = http.contentLength();
+                    if (contentLength > 0 && Update.begin(contentLength)) {
+                        size_t written = 0;
+                        uint8_t buff[1024];
+                        
+                        while ((http.connected() || http.available()) && written < contentLength) {
+                            size_t size = http.available();
+                            if (size) {
+                                int c = http.read(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+                                Update.write(buff, c);
+                                written += c;
+                                
+                                sm->otaProgress = (written * 100) / contentLength;
+                            }
+                            vTaskDelay(pdMS_TO_TICKS(5));
+                        }
+
+                        if (written == contentLength && Update.end() && Update.isFinished()) {
+                            Serial.println("[OTA] Success! Rebooting...");
+                            vTaskDelay(pdMS_TO_TICKS(1000));
+                            ESP.restart(); 
+                        } else {
+                            Update.abort();
+                        }
+                    }
+                }
+                http.stop();
+                wifiClient.stop();
             }
         }
 

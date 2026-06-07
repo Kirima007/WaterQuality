@@ -50,6 +50,9 @@ private:
     void _drawSimResult();
     void _drawNetworkStatus();
     void _drawSystemSetup();
+    void _drawOtaChecking();
+    void _drawOtaResult();
+    void _drawOtaUpdating();
 
 #if SENSOR_COUNT == 3
     // วาดหน้าจอที่มีเฉพาะในรุ่น 3 หัว
