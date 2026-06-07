@@ -3,3 +3,7 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Ignore configuration files with sensitive credentials
+src/config.h
+src/Config.h
