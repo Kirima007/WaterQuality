@@ -74,9 +74,10 @@ public:
     bool simLastSuccess  = false;
     int  simLastHttpCode = 0;
 
-    bool otaHasUpdate = true;
-    String otaLatestVersion = "V1.5";
-    int otaProgress = 45;
+    bool otaCheckSuccess = false;
+    bool otaHasUpdate = false;
+    String otaLatestVersion = "";
+    int otaProgress = 0;
     String otaDownloadUrl = "";
     uint16_t tmpDeviceId = 0;
 

@@ -227,10 +227,12 @@ void StateMachine::_handleEditThresh(ButtonEvent ev) {
         
         float step = (ev == ButtonEvent::ROTATE_CW) ? 0.1f : -0.1f;
         
-        if (now - lastRotMs < 150) {
+        if (now - lastRotMs < 200) {  // ถ้าหมุนติดๆ กันเร็วกว่า 200ms
             fastCount++;
-            if (fastCount > 2) step *= 10.0f;
-        } else { fastCount = 0; }
+            if (fastCount > 2) step *= 5.0f; // หมุนเร็วให้ก้าวกระโดดทีละ 1.0
+        } else {
+            fastCount = 0;
+        }
         lastRotMs = now;
         
         ThreshData* t = nullptr;
@@ -318,9 +320,9 @@ void StateMachine::_handleTempCal(ButtonEvent ev) {
 
         float step = (ev == ButtonEvent::ROTATE_CW) ? 0.1f : -0.1f;
         
-        if (now - lastRotMs < 150) {
+        if (now - lastRotMs < 200) {
             fastCount++;
-            if (fastCount > 2) step *= 10.0f;
+            if (fastCount > 2) step *= 5.0f; // ก้าวกระโดดทีละ 1.0
         } else { fastCount = 0; }
         lastRotMs = now;
 
@@ -407,10 +409,10 @@ void StateMachine::_handleEditCalManual(ButtonEvent ev) {
 
         float step = (ev == ButtonEvent::ROTATE_CW) ? 0.001f : -0.001f;
         
-        if (now - lastRotMs < 150) {
+        if (now - lastRotMs < 200) {
             fastCount++;
-            if (fastCount > 6) step *= 100.0f; 
-            else if (fastCount > 2) step *= 10.0f;
+            if (fastCount > 6) step *= 50.0f; // หมุนเร็วจัด! ก้าวกระโดดทีละ 0.100
+            else if (fastCount > 2) step *= 10.0f; // หมุนเร็ว ก้าวกระโดดทีละ 0.010
         } else { fastCount = 0; }
         lastRotMs = now;
 
@@ -565,10 +567,6 @@ void StateMachine::_handleOtaChecking(ButtonEvent ev) {
         requestSound(SoundEvent::BACK);
         menuIndex = 7;
         _goTo(AppState::MAIN_MENU);
-    } else if (ev == ButtonEvent::LONG_PRESS) {
-        // TEST HOOK: แอบให้กดค้างเพื่อข้ามไปหน้า RESULT ไว้ดู UI 
-        requestSound(SoundEvent::SUCCESS);
-        _goTo(AppState::OTA_RESULT);
     }
 }
 
@@ -582,7 +580,7 @@ void StateMachine::_handleOtaResult(ButtonEvent ev) {
             WifiTask::requestStartOta(otaDownloadUrl);
             _goTo(AppState::OTA_UPDATING);
         }
-    } else if (ev == ButtonEvent::SHORT_PRESS || ev == ButtonEvent::LONG_PRESS) {
+    } else if (ev == ButtonEvent::SHORT_PRESS) {
         requestSound(SoundEvent::BACK);
         menuIndex = 7;
         _goTo(AppState::MAIN_MENU);
@@ -594,6 +592,7 @@ void StateMachine::_handleOtaUpdating(ButtonEvent ev) {
 }
 
 void StateMachine::onOtaCheckComplete(bool success) {
+    otaCheckSuccess = success;
     if (success) requestSound(SoundEvent::SUCCESS);
     else requestSound(SoundEvent::BACK);
     _goTo(AppState::OTA_RESULT);
@@ -610,10 +609,10 @@ void StateMachine::_handleEditDeviceId(ButtonEvent ev) {
         uint32_t now = millis();
         int step = (ev == ButtonEvent::ROTATE_CW) ? 1 : -1;
         
-        if (now - lastRotMs < 150) {
+        if (now - lastRotMs < 200) {
             fastCount++;
-            if (fastCount > 6) step *= 10;
-            else if (fastCount > 3) step *= 5;
+            if (fastCount > 6) step *= 5;
+            else if (fastCount > 3) step *= 2;
         } else { fastCount = 0; }
         lastRotMs = now;
         int newId = (int)tmpDeviceId + step;

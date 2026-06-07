@@ -489,7 +489,11 @@ void ScreenManager::_drawOtaChecking() {
 
 void ScreenManager::_drawOtaResult() {
     _lcd.setCursor(0, 0); _lcd.print("--- FW Update ------");
-    if (_sm.otaHasUpdate) {
+    if (!_sm.otaCheckSuccess) {
+        _lcd.setCursor(0, 1); _lcd.print("Check Failed!       ");
+        _lcd.setCursor(0, 2); _lcd.print("Cannot connect svr. ");
+        _lcd.setCursor(0, 3); _lcd.print("Click to go back    ");
+    } else if (_sm.otaHasUpdate) {
         _lcd.setCursor(0, 1); _lcd.print("New: "); _lcd.print(_sm.otaLatestVersion);
         _lcd.setCursor(0, 2); _lcd.print("Cur: "); _lcd.print(FW_VERSION);
         _lcd.setCursor(0, 3); _lcd.print("Hold 10s to Update! ");

@@ -178,16 +178,23 @@ void WifiTask::taskEntry(void* param) {
 
                 if (httpCode >= 200 && httpCode < 300) {
                     String payload = http.responseBody();
+                    Serial.println("[OTA] Raw JSON from Server:");
+                    Serial.println(payload);
+
                     JsonDocument doc;
                     DeserializationError error = deserializeJson(doc, payload);
                     
                     if (!error) {
                         String latestVer = doc["latest_version"].as<String>();
+                        Serial.println("[OTA] Parsed Version: " + latestVer);
+                        
                         sm->otaLatestVersion = latestVer;
                         sm->otaDownloadUrl   = doc["firmware_url"].as<String>();
                         // ถ้าเวอร์ชันจากเว็บ ไม่ตรงกับที่มีอยู่ในเครื่อง = มีอัปเดตใหม่
                         sm->otaHasUpdate = (latestVer != String(FW_VERSION));
                         success = true;
+                    } else {
+                        Serial.println("[OTA] JSON Parse Failed: " + String(error.c_str()));
                     }
                 } else {
                     http.responseBody(); // เคลียร์ข้อความตอบกลับทิ้ง
