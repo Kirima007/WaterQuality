@@ -1,115 +1,95 @@
-# 🌊 WaterQuality Monitoring System (ESP32)
+# Water Quality Monitoring System (Firmware)
 
-A robust, real-time water quality monitoring system built on the **ESP32** platform. This project features high-precision sensor reading, GPS tracking, and dual-mode data transmission (WiFi/GPRS) designed for environmental monitoring and IoT applications.
+A professional-grade, FreeRTOS-based firmware for an ESP32 water quality monitoring device. Developed by AIOT LAB (KMITL).
 
----
+This system continuously monitors water quality metrics, displays data via an I2C LCD, and transmits payloads to a remote server using either Wi-Fi or a Cellular GPRS connection. It features an interactive menu system navigated via a rotary encoder and includes robust subsystems for sensor calibration, alarm thresholds, and Over-The-Air (OTA) firmware updates.
 
-## 🚀 Key Features
+## Features
 
-*   **Multi-Channel Support:** Dynamic support for 1-Channel (Salinity) or 3-Channel (Salinity, pH, DO) sensor configurations via build environments.
-*   **High-Precision Sensing:** Uses the **ADS1115 (16-bit ADC)** for accurate analog readings with temperature compensation.
-*   **Dual Connectivity:** Flexible data reporting via **SIM800L (GSM/GPRS)** or **WiFi**, configurable through the system menu.
-*   **GPS Integration:** Automatically logs Latitude/Longitude coordinates with every sensor data point.
-*   **Interactive UI:** Large 20x4 LCD interface with a rotary encoder for menu navigation and system configuration.
-*   **On-Device Calibration:** Built-in calibration wizard for DI Water and Salt Solutions, saving values directly to Non-Volatile Storage (NVS).
-*   **Real-time Multitasking:** Powered by **FreeRTOS**, ensuring seamless sensor sampling, UI responsiveness, and background data transmission.
+* **Multi-Tasking Architecture**: Utilizes FreeRTOS for decoupled task management (Sensing, GPS, Display, Input, Networking, and Alarms) to ensure system stability.
+* **Dual Hardware Configurations**: 
+  * 1-Channel Mode: Monitors Salinity (EC) and Temperature.
+  * 3-Channel Mode: Monitors Salinity (EC), pH, Dissolved Oxygen (DO), and Temperature.
+* **Dual Network Connectivity**: Supports seamless switching between Wi-Fi and SIM800L (GPRS).
+* **Hardware User Interface**: 20x4 Character LCD paired with a rotary encoder for navigation, calibration, and local configuration.
+* **On-Device Calibration**: Auto and manual calibration for alpha/beta multi-point correction, stored securely in Non-Volatile Storage (NVS).
+* **Over-The-Air (OTA) Updates**: Supports remote firmware updates via HTTP over Wi-Fi.
+* **Location Tracking**: Integrates Neo-6M GPS for geospatial data tagging.
 
----
+## Prerequisites
 
-## 🛠 Hardware Architecture
+### Hardware
+* ESP32 Development Board
+* Adafruit ADS1115 (16-bit ADC)
+* 20x4 I2C LCD Display
+* Rotary Encoder (with push button)
+* DS18B20 One-Wire Temperature Sensor
+* Analog Sensors (EC, pH, DO)
+* SIM800L GSM/GPRS Module
+* Neo-6M GPS Module
+* Buzzer & RGB LED for alarm states
 
-### Core Components
-*   **Microcontroller:** ESP32 (Tested on TTGO T-Call V1.4)
-*   **Sensors:** 
-    *   **ADS1115:** 16-bit I2C ADC for water quality sensors.
-    *   **DS18B20:** OneWire temperature sensor.
-    *   **GPS Module:** Serial NEO-6M or compatible.
-*   **Communication:**
-    *   **SIM800L:** GSM/GPRS modem for remote logging.
-    *   **WiFi:** Integrated ESP32 WiFi for local hotspot connectivity.
-*   **User Interface:**
-    *   **LCD 20x4:** I2C display.
-    *   **Rotary Encoder:** Navigation (CLK, DT, SW).
-    *   **Buzzer & RGB LED:** Status and alarm notifications.
+### Software
+* [PlatformIO IDE](https://platformio.org/) (VS Code Extension)
+* C++ / Arduino Framework for ESP32
 
-### Pin Mapping (Default)
-| Component | Pin | Function |
-| :--- | :--- | :--- |
-| **Rotary Encoder** | 32, 33, 14 | CLK, DT, SW |
-| **OneWire (Temp)** | 18 | DS18B20 Data |
-| **GPS** | 19 (RX), 25 (TX) | Serial Communication |
-| **Buzzer** | 2 | Alarm Output |
-| **I2C (LCD/ADC)** | 21 (SDA), 22 (SCL) | Bus Communication |
-| **RGB LED** | 15, 13, 12 | R, G, B Status (3-CH mode) |
+## Installation & Build Instructions
 
----
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Kirima007/WaterQuality.git
+   cd WaterQuality
+   ```
 
-## 💻 Software Architecture
+2. **Open with PlatformIO**
+   Open the project folder in VS Code with the PlatformIO extension installed. PlatformIO will automatically download the required libraries specified in `platformio.ini`.
 
-The system utilizes a **Multi-tasking architecture** based on FreeRTOS to handle complex operations without blocking the main logic:
+3. **Select Environment**
+   The `platformio.ini` file contains two build environments based on your hardware setup:
+   * `env:Sensor_1` (1-Channel mode)
+   * `env:Sensor_3` (3-Channel mode)
 
-*   **SensorTask (Core 0):** High-frequency sampling of ADC and Temperature data.
-*   **GPSTask (Core 0):** Asynchronous parsing of NMEA strings from the GPS module.
-*   **Network Tasks (Core 0):** Independent tasks for SIM800L and WiFi state management and HTTP POST requests.
-*   **ScreenManager (Core 1):** Dedicated UI rendering and LCD updates.
-*   **StateMachine (Core 1):** Central logic handling user inputs, menu navigation, and system states.
+4. **Build and Upload**
+   Connect your ESP32 via USB and run the upload command:
+   ```bash
+   pio run -e Sensor_1 -t upload
+   ```
 
----
+## Configuration
 
-## 📦 Getting Started
+Core system parameters, network credentials, and API endpoints are defined in `src/config.h`. Modify this file before compiling for production deployment:
 
-### 1. Prerequisites
-*   Visual Studio Code with **PlatformIO IDE** extension.
-*   ESP32 Development Board.
-
-### 2. Configuration
-Modify `src/Config.h` to match your deployment environment:
-```cpp
-#define DEVICE_ID       99
-#define SIM_APN         "internet"        // APN (e.g., "internet", "ais", "true")
-#define WIFI_SSID       "Your_SSID"
-#define WIFI_PASS       "Your_Password"
-#define HTTP_HOST       "your.api.endpoint"
+```c
+#define HTTP_HOST       "161.246.157.210"
+#define HTTP_PATH       "/api/data"
+#define WIFI_SSID       "BCK-WIFI"
+#define WIFI_PASS       "123456789"
+#define SIM_APN         "internet"
 ```
 
-### 3. Build & Flash
-Choose the environment based on your hardware setup:
+*Note: Runtime configurations such as Network Mode (Wi-Fi/SIM), Device ID, Alarm Limits, and Calibration offsets are stored in NVS and can be modified directly through the device's physical menu.*
 
-*   **1-Channel Mode:** `pio run -e Sensor_1 -t upload`
-*   **3-Channel Mode:** `pio run -e Sensor_3 -t upload`
+## Usage Overview
 
----
+Once powered on, the device enters the `STARTUP` state and initializes hardware. The user can interact with the system using the rotary encoder:
+* **Rotate**: Scroll through menu items or adjust values.
+* **Short Press**: Select an item, confirm a value, or navigate forward/backward.
+* **Long Press**: Trigger special actions (e.g., capture stable calibration values, force manual data sync).
 
-## 📖 User Guide
+**Main Menu Structure:**
+* Monitor Data (View real-time sensor metrics and network/GPS status)
+* Network Status (Check Wi-Fi RSSI or SIM CSQ)
+* GPS Status (View Latitude, Longitude, and Satellite locks)
+* Setting (Switch between Wi-Fi/SIM and toggle Buzzer)
+* Sensor Calibrate (Auto/Manual calibration for specific sensors)
+* Temp Calibrate (Set offset for DS18B20)
+* Alarm Limits (Configure Green/Yellow/Red LED and Buzzer thresholds)
+* Firmware Update (Check and download OTA updates)
+* System Info (View Device ID, Firmware version, and Factory Reset option)
 
-### Navigation
-*   **Rotate Encoder:** Navigate through menus or change values.
-*   **Short Press:** Confirm selection or enter a menu.
-*   **Long Press:** Exit or go back to the previous screen.
+## License
 
-### Calibration Procedure
-1.  Enter **Calibration Mode** from the Main Menu.
-2.  Follow the **DI Water** prompt: Submerge the sensor in distilled water and wait for the reading to stabilize.
-3.  Follow the **Salt Solution** prompt: Submerge the sensor in the standard salt solution.
-4.  Confirm and save: The system will calculate the slope and offset and store them in the NVS.
+**Proprietary License**  
+Copyright (c) 2026 AIOT LAB (KMITL). All rights reserved.
 
-### Data Reporting
-Data is automatically packaged into a JSON payload and sent to the configured `HTTP_HOST`:
-```json
-{
-  "id": 99,
-  "salinity": "12.85",
-  "temp": "28.5",
-  "address": {
-    "x": "13.123456",
-    "y": "100.123456"
-  }
-}
-```
-
----
-
-## 🏷️ Credits
-**Developed by:** Weerapat C. (2026)  
-**Laboratory:** AIOT LAB  
-**Version:** V1.2(A)
+This software is the confidential and proprietary information of AIOT LAB, King Mongkut's Institute of Technology Ladkrabang (KMITL). You shall not disclose such Confidential Information and shall use it only in accordance with the terms of the license agreement you entered into with AIOT LAB.
