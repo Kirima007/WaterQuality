@@ -308,11 +308,16 @@ void ScreenManager::_drawTempCal() {
     _lcd.setCursor(0, 1); _lcd.print(" Offset : [");
     _printPadded(NVSManager::tempOffset, 1, 5); _lcd.print("]  ");
     
-    char buf[21];
-    snprintf(buf, sizeof(buf), " Current: %-5.1f", _sensor.tempC);
-    _lcd.setCursor(0, 2); _lcd.print(buf);
-    _lcd.print((char)223); // สัญลักษณ์องศา (°)
-    _lcd.print("C  ");
+    _lcd.setCursor(0, 2);
+    _lcd.print(" Current: ");
+    if (_sensor.tempValid) {
+        _printPadded(_sensor.tempC, 1, 5);
+        _lcd.print(" ");
+        _lcd.print((char)223); // สัญลักษณ์องศา (°)
+        _lcd.print("C  ");
+    } else {
+        _lcd.print("ERR       ");
+    }
     
     _lcd.setCursor(0, 3); _lcd.print("   Click to Save    ");
 }

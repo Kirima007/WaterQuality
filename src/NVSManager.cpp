@@ -76,9 +76,9 @@ void NVSManager::load() {
     calibDO.beta  = _prefs.getFloat(KEY_DO_B, 0.0f);
 
     // โหลด Thresholds สำหรับ 3 หัว
-    threshEC.green  = _prefs.getFloat(KEY_TH_EC_G, 15.0f);
-    threshEC.yellow = _prefs.getFloat(KEY_TH_EC_Y, 25.0f);
-    threshEC.red    = _prefs.getFloat(KEY_TH_EC_R, 30.0f);
+    threshEC.green  = _prefs.getFloat(KEY_TH_EC_G, 1.0f);
+    threshEC.yellow = _prefs.getFloat(KEY_TH_EC_Y, 2.5f);
+    threshEC.red    = _prefs.getFloat(KEY_TH_EC_R, 4.0f);
 
     threshPH.green  = _prefs.getFloat(KEY_TH_PH_G, 6.5f);
     threshPH.yellow = _prefs.getFloat(KEY_TH_PH_Y, 8.5f);
@@ -93,9 +93,9 @@ void NVSManager::load() {
     calibEC.beta  = _prefs.getFloat(KEY_BETA, 0.0f);
 
     // โหลด Threshold (1CH)
-    thresh.green = _prefs.getFloat(KEY_THRESH_G, 15.0f);
-    thresh.yellow = _prefs.getFloat(KEY_THRESH_Y, 25.0f);
-    thresh.red   = _prefs.getFloat(KEY_THRESH_R, 30.0f);
+    thresh.green = _prefs.getFloat(KEY_THRESH_G, 1.0f);
+    thresh.yellow = _prefs.getFloat(KEY_THRESH_Y, 2.5f);
+    thresh.red   = _prefs.getFloat(KEY_THRESH_R, 4.0f);
 #endif
 
     // โหลด System Config

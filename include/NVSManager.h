@@ -10,9 +10,9 @@ struct CalibData {
 
 // ข้อมูล Threshold
 struct ThreshData {
-    float green = 15.0f;  // ต่ำกว่านี้ → LED เขียว
-    float yellow= 25.0f;  // ต่ำกว่านี้ → LED เหลือง + alarm
-    float red   = 30.0f;  // สูงกว่านี้ → LED แดง + alarm
+    float green = 1.0f;  // ต่ำกว่านี้ → LED เขียว
+    float yellow= 2.5f;  // ต่ำกว่านี้ → LED เหลือง + alarm
+    float red   = 4.0f;  // สูงกว่านี้ → LED แดง + alarm
 };
 
 struct SystemConfig {
