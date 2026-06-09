@@ -77,6 +77,7 @@ public:
     bool otaCheckSuccess = false;
     bool otaHasUpdate = false;
     String otaLatestVersion = "";
+    String otaMD5 = "";
     int otaProgress = 0;
     String otaDownloadUrl = "";
     uint16_t tmpDeviceId = 0;
@@ -86,6 +87,9 @@ public:
     
     // WifiTask/SimTask เรียกเมื่อเช็คเวอร์ชันเสร็จ
     void onOtaCheckComplete(bool success);
+
+    // WifiTask เรียกเมื่อการดาวน์โหลด OTA ล้มเหลวกลางทาง
+    void onOtaDownloadFailed();
 
 private:
     AppState _current;

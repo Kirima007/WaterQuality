@@ -617,6 +617,12 @@ void StateMachine::onOtaCheckComplete(bool success) {
     _goTo(AppState::OTA_RESULT);
 }
 
+void StateMachine::onOtaDownloadFailed() {
+    requestSound(SoundEvent::BACK); // เล่นเสียง Error
+    menuIndex = 6;                  // กลับไปชี้ที่เมนู Firmware Update
+    _goTo(AppState::MAIN_MENU);
+}
+
 // ==========================================
 // EDIT_DEVICE_ID
 // ==========================================

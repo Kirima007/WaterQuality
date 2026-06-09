@@ -190,6 +190,7 @@ void WifiTask::taskEntry(void* param) {
                         
                         sm->otaLatestVersion = latestVer;
                         sm->otaDownloadUrl   = doc["firmware_url"].as<String>();
+                        sm->otaMD5           = doc["md5"] | ""; // ดึงค่า MD5 (ถ้ามี)
                         // ถ้าเวอร์ชันจากเว็บ ไม่ตรงกับที่มีอยู่ในเครื่อง = มีอัปเดตใหม่
                         sm->otaHasUpdate = (latestVer != String(FW_VERSION));
                         success = true;
@@ -224,10 +225,16 @@ void WifiTask::taskEntry(void* param) {
                 http.endRequest();
 
                 int httpCode = http.responseStatusCode();
+                bool otaSuccess = false;
 
                 if (httpCode == 200) {
                     int contentLength = http.contentLength();
                     if (contentLength > 0 && Update.begin(contentLength)) {
+                        
+                        if (sm->otaMD5.length() > 0) {
+                            Update.setMD5(sm->otaMD5.c_str()); // สั่งให้ ESP32 ตรวจสอบความถูกต้องระดับ MD5
+                        }
+
                         size_t written = 0;
                         uint8_t buff[1024];
                         
@@ -246,6 +253,7 @@ void WifiTask::taskEntry(void* param) {
                         if (written == contentLength && Update.end() && Update.isFinished()) {
                             Serial.println("[OTA] Success! Rebooting...");
                             vTaskDelay(pdMS_TO_TICKS(1000));
+                            otaSuccess = true;
                             ESP.restart(); 
                         } else {
                             Update.abort();
@@ -254,6 +262,12 @@ void WifiTask::taskEntry(void* param) {
                 }
                 http.stop();
                 wifiClient.stop();
+
+                // ถ้าล้มเหลว (เช่น เน็ตหลุด หรือ Update ไม่จบ) แจ้ง StateMachine ให้เด้งกลับหน้าเมนู
+                if (!otaSuccess) {
+                    Serial.println("[OTA] Download Failed or Interrupted!");
+                    sm->onOtaDownloadFailed();
+                }
             }
         }
 
