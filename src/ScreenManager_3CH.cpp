@@ -1,5 +1,6 @@
 #include "ScreenManager.h"
 #include "SimTask.h"
+#include "SensorMath.h"
 
 #if SENSOR_COUNT == 3
 
@@ -274,9 +275,11 @@ void ScreenManager::_drawEditThresh() {
     float val = 0.0f;
     
     _lcd.setCursor(0, 1);
-    if (_sm.editingColor == 'G') { _lcd.print("Max Green (G) limit "); val = t->green; } 
-    else if (_sm.editingColor == 'Y') { _lcd.print("Max Yellow(Y) limit "); val = t->yellow; } 
-    else { _lcd.print("Max Red (R) limit   "); val = t->red; }
+    const char* prefix = (_sm.currentParam == 2) ? "Min " : "Max ";
+    
+    if (_sm.editingColor == 'G') { _lcd.print(prefix); _lcd.print("Green (G) limit "); val = t->green; } 
+    else if (_sm.editingColor == 'Y') { _lcd.print(prefix); _lcd.print("Yellow(Y) limit "); val = t->yellow; } 
+    else { _lcd.print(prefix); _lcd.print("Red (R) limit   "); val = t->red; }
 
     _lcd.setCursor(0, 2); _lcd.print("      ["); _printPadded(val, 1, 5); _lcd.print("]       ");
     _lcd.setCursor(0, 3); _lcd.print("   Click to Save    ");
@@ -322,34 +325,70 @@ void ScreenManager::_drawTempCal() {
     _lcd.setCursor(0, 3); _lcd.print("   Click to Save    ");
 }
 
+// พิมพ์ข้อความเต็มแถว (เติมช่องว่างให้ครบ 20 ตัว กันตัวอักษรเก่าค้าง)
+static void _printRow(LiquidCrystal_I2C& lcd, uint8_t row, const char* text) {
+    char line[21];
+    snprintf(line, sizeof(line), "%-20.20s", text);
+    lcd.setCursor(0, row);
+    lcd.print(line);
+}
+
+// หน้าจอ Calibrate (ใช้ร่วมกันทั้งจุดที่ 1 และ 2)
+//  Row0: 1.Calib pH  Std 4.01
+//  Row1: pH:  4.07 V:2.1934
+//  Row2:  25.3C WAIT  9/15   |  ** STABLE **
+//  Row3: Hold:Save Clk:Cancel
+static void _drawCalLive(LiquidCrystal_I2C& lcd, const SensorData& s, uint8_t param, uint8_t step) {
+    static const char* pfx[]      = { "EC", "pH", "DO" };
+    static const char* label[]    = { "EC:", "pH:", "DO:" };
+    static const char* stdStep1[] = { "Std 0.00", "Std 4.01", "Std 0%"   };
+    static const char* stdStep2[] = { "Std 12.88", "Std 6.86", "Std 100%" };
+    if (param > 2) param = 0;
+
+    char buf[32];
+
+    // Row 0: ขั้นตอน + ค่าน้ำยามาตรฐาน
+    snprintf(buf, sizeof(buf), "%u.Calib %s%10s", step, pfx[param],
+             (step == 1) ? stdStep1[param] : stdStep2[param]);
+    _printRow(lcd, 0, buf);
+
+    // Row 1: ค่าที่อ่านได้ตอนนี้ + แรงดัน
+    if (s.adsValid) {
+        float val  = (param == 0) ? s.valEC  : (param == 1 ? s.valPH  : s.valDO);
+        float volt = (param == 0) ? s.voltEC : (param == 1 ? s.voltPH : s.voltDO);
+        snprintf(buf, sizeof(buf), "%s%6.2f V:%6.4f", label[param], val, volt);
+    } else {
+        snprintf(buf, sizeof(buf), "%s ERR (ADS)", label[param]);
+    }
+    _printRow(lcd, 1, buf);
+
+    // Row 2: อุณหภูมิ + สถานะความนิ่ง
+    char tempStr[8];
+    if (s.tempValid) snprintf(tempStr, sizeof(tempStr), "%5.1fC", s.tempC);
+    else             snprintf(tempStr, sizeof(tempStr), "T:ERR");
+
+    SensorMath::StabilityInfo st = SensorMath::getStability(param);
+    char status[16];
+    if (st.count < SensorMath::STABLE_WINDOW) {
+        snprintf(status, sizeof(status), "WAIT %2u/%u", st.count, SensorMath::STABLE_WINDOW);
+    } else if (!st.stable) {
+        snprintf(status, sizeof(status), "WAIT +-%.2f", st.range);
+    } else {
+        snprintf(status, sizeof(status), "** STABLE **");
+    }
+    snprintf(buf, sizeof(buf), "%s %s", tempStr, status);
+    _printRow(lcd, 2, buf);
+
+    // Row 3: วิธีใช้งาน
+    _printRow(lcd, 3, "Hold:Save Clk:Cancel");
+}
+
 void ScreenManager::_drawCal1() {
-    char buf[21];
-    const char* targets[] = { "Target: 0.0 mS/cm", "Target: 4.0 pH     ", "Target: 0.0 mg/L   " };
-    const char* name[]   = { "1.Calib EC          ", "1.Calib pH          ", "1.Calib DO          " };
-    
-    _lcd.setCursor(0, 0); _lcd.print(name[_sm.currentParam]); 
-    _lcd.setCursor(0, 1); _lcd.print(targets[_sm.currentParam]);
-    
-    float v = (_sm.currentParam == 0) ? _sensor.voltEC : (_sm.currentParam == 1 ? _sensor.voltPH : _sensor.voltDO);
-    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", v, _sensor.tempC);
-    _lcd.setCursor(0, 2); _lcd.print(buf);
-    
-    _lcd.setCursor(0, 3); _lcd.print("Click to Cancel     ");
+    _drawCalLive(_lcd, _sensor, _sm.currentParam, 1);
 }
 
 void ScreenManager::_drawCal2() {
-    char buf[21];
-    const char* targets[] = { "Target: 12.88 mS/cm", "Target: 7.0 pH     ", "Target: 8.0 mg/L   " };
-    const char* name[]   = { "2.Calib EC          ", "2.Calib pH          ", "2.Calib DO          " };
-    
-    _lcd.setCursor(0, 0); _lcd.print(name[_sm.currentParam]); 
-    _lcd.setCursor(0, 1); _lcd.print(targets[_sm.currentParam]);
-    
-    float v = (_sm.currentParam == 0) ? _sensor.voltEC : (_sm.currentParam == 1 ? _sensor.voltPH : _sensor.voltDO);
-    snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", v, _sensor.tempC);
-    _lcd.setCursor(0, 2); _lcd.print(buf);
-    
-    _lcd.setCursor(0, 3); _lcd.print("Click to Cancel     ");
+    _drawCalLive(_lcd, _sensor, _sm.currentParam, 2);
 }
 
 void ScreenManager::_drawCalFinish() {

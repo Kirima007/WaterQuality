@@ -106,8 +106,10 @@ void WifiTask::taskEntry(void* param) {
             if (millis() - lastWifiCheck > 5000) {
                 Serial.println("[WIFI] Connecting to Hotspot...");
                 WiFi.mode(WIFI_STA);
-                WiFi.setTxPower(WIFI_POWER_19_5dBm); // ตั้งกำลังส่ง Wi-Fi สูงสุด (19.5 dBm)
                 WiFi.begin(WIFI_SSID, WIFI_PASS); // ดึงชื่อ/รหัส จาก Config.h
+                // ลดกำลังส่งเพื่อลดกระแสพีค (เดิม 19.5 dBm) — ตั้งหลัง begin() เพื่อให้ค่าไม่ถูกรีเซ็ตทับ
+                // ถ้า Hotspot อยู่ไกลแล้วต่อไม่ติด ค่อยขยับขึ้นเป็น WIFI_POWER_15dBm
+                WiFi.setTxPower(WIFI_POWER_13dBm);
                 lastWifiCheck = millis();
             }
         } else {

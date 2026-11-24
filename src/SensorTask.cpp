@@ -97,6 +97,9 @@ void SensorTask::taskEntry(void* param) {
                 NVSManager::calibEC.alpha,
                 NVSManager::calibEC.beta
             );
+
+            // ส่งค่าเข้า Stability Tracker (ใช้ตอน Calibrate)
+            SensorMath::pushSample(0, data.voltEC, data.tempC);
 #else
             // --- READ EC (A0) ---
             int16_t rawEC = readADSAvg(ads, 0, 10);
@@ -113,8 +116,15 @@ void SensorTask::taskEntry(void* param) {
             int16_t rawDO = readADSAvg(ads, 1, 10);
             data.voltDO   = ads.computeVolts(rawDO);
             data.valDO    = SensorMath::calculateDO(data.voltDO, data.tempC, NVSManager::calibDO.alpha, NVSManager::calibDO.beta);
+
+            // ส่งค่าเข้า Stability Tracker (ใช้ตอน Calibrate)
+            SensorMath::pushSample(0, data.voltEC, data.tempC);
+            SensorMath::pushSample(1, data.voltPH, data.tempC);
+            SensorMath::pushSample(2, data.voltDO, data.tempC);
 #endif
         } else {
+            // ADS หลุด -> ล้างหน้าต่างความนิ่ง ป้องกันการ Capture ค่าเก่าค้าง
+            SensorMath::clearStability();
             // ADS missing -> set values to 0 or something distinctive
             data.valPPT = 0.0f;
             data.valEC = 0.0f;

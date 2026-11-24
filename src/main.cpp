@@ -45,7 +45,7 @@
 #define DISPLAY_TASK_PRIORITY  2
 #define DISPLAY_TASK_CORE      1
 
-#define INPUT_TASK_STACK       2048
+#define INPUT_TASK_STACK       4096   // เดิม 2048: ไม่พอสำหรับการอ่าน/เขียน NVS (Preferences) ใน StateMachine
 #define INPUT_TASK_PRIORITY    3
 #define INPUT_TASK_CORE        1
 

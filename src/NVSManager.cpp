@@ -108,23 +108,8 @@ void NVSManager::load() {
 
     _prefs.end();
 
-    // --- Validation Logic ---
-    auto isSane = [](float alpha, float beta) {
-        return (alpha > 0.001f && alpha < 100.0f) && (beta > -1000.0f && beta < 1000.0f);
-    };
-
-    if (!isSane(calibEC.alpha, calibEC.beta)) {
-        calibEC.alpha = 1.0f; calibEC.beta = 0.0f;
-    }
-#if SENSOR_COUNT == 3
-    if (!isSane(calibPH.alpha, calibPH.beta)) {
-        calibPH.alpha = 1.0f; calibPH.beta = 0.0f;
-    }
-    if (!isSane(calibDO.alpha, calibDO.beta)) {
-        calibDO.alpha = 1.0f; calibDO.beta = 0.0f;
-    }
-#endif
-    if (tempOffset < -20.0f || tempOffset > 20.0f) {
+    // Sanity check, constrain to the same range as in the UI (-10.0 to 10.0)
+    if (tempOffset < -10.0f || tempOffset > 10.0f) {
         tempOffset = 0.0f;
     }
 }

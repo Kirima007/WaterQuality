@@ -400,9 +400,9 @@ void StateMachine::_handleEditCalManual(ButtonEvent ev) {
 
         if (editingColor == 'A') {
             NVSManager::calibEC.alpha += step;
-            // ป้องกัน Alpha ติดลบหรือเป็นศูนย์ (เดี๋ยวเอาไปคูณแล้วค่าน้ำหายหมด)
-            if (NVSManager::calibEC.alpha < 0.001f) {
-                NVSManager::calibEC.alpha = 0.001f;
+            // Prevent alpha from being too close to zero, which can cause issues.
+            if (fabsf(NVSManager::calibEC.alpha) < 0.001f) {
+                NVSManager::calibEC.alpha = (step > 0) ? 0.001f : -0.001f;
             }
         } else if (editingColor == 'B') {
             NVSManager::calibEC.beta += step;

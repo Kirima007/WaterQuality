@@ -45,8 +45,8 @@ bool SensorMath::computeAlphaBeta(uint8_t currentParam, float v1, float t1,
         m1 = calcEC25(v1, t1);
         m2 = calcEC25(v2, t2);
     } else if (currentParam == 1) {
-        target1 = 4.0f;
-        target2 = 7.0f;
+        target1 = 4.01f; // ค่าน้ำยาขวดที่ 1
+        target2 = 6.86f; // ค่าน้ำยาขวดที่ 2
         m1 = calcPHBase(v1, t1);
         m2 = calcPHBase(v2, t2);
     } else {
@@ -91,50 +91,96 @@ float SensorMath::calculateDO(float volt, float tempC, float alpha, float beta) 
     return doFinal;
 }
 
+// ==========================================
+// Stability Tracker
+// ==========================================
+// Ring buffer ต่อเซ็นเซอร์ (เผื่อไว้ 3 ช่องเสมอ รุ่น 1 หัวใช้แค่ช่อง 0)
+struct StabBuf {
+    float   base[SensorMath::STABLE_WINDOW];
+    float   volt[SensorMath::STABLE_WINDOW];
+    float   temp[SensorMath::STABLE_WINDOW];
+    uint8_t head;
+    uint8_t count;
+};
+static StabBuf      s_stab[3] = {};
+static portMUX_TYPE s_stabMux = portMUX_INITIALIZER_UNLOCKED; // กันอ่าน/เขียนชนกันข้าม Core
+
+float SensorMath::stableThreshold(uint8_t param) {
+    if (param == 1) return 0.03f;  // pH: แกว่งไม่เกิน 0.03 pH
+    return 0.5f;                   // EC (mS/cm) / DO (mg/L): คงเกณฑ์เดิม
+}
+
+void SensorMath::pushSample(uint8_t param, float volt, float tempC) {
+    if (param > 2) return;
+
+    float baseVal;
+    if (param == 0)      baseVal = calcEC25(volt, tempC);
+    else if (param == 1) baseVal = calcPHBase(volt, tempC);
+    else                 baseVal = calcDOBase(volt, tempC);
+
+    portENTER_CRITICAL(&s_stabMux);
+    StabBuf& b = s_stab[param];
+    b.base[b.head] = baseVal;
+    b.volt[b.head] = volt;
+    b.temp[b.head] = tempC;
+    b.head = (b.head + 1) % STABLE_WINDOW;
+    if (b.count < STABLE_WINDOW) b.count++;
+    portEXIT_CRITICAL(&s_stabMux);
+}
+
+void SensorMath::clearStability() {
+    portENTER_CRITICAL(&s_stabMux);
+    for (auto& b : s_stab) { b.head = 0; b.count = 0; }
+    portEXIT_CRITICAL(&s_stabMux);
+}
+
+// คัดลอก buffer ออกมาก่อน แล้วค่อยคำนวณนอก critical section
+static StabBuf _snapshot(uint8_t param) {
+    StabBuf copy;
+    portENTER_CRITICAL(&s_stabMux);
+    copy = s_stab[param];
+    portEXIT_CRITICAL(&s_stabMux);
+    return copy;
+}
+
+SensorMath::StabilityInfo SensorMath::getStability(uint8_t param) {
+    StabilityInfo info{0, 0.0f, false};
+    if (param > 2) return info;
+
+    StabBuf b = _snapshot(param);
+    info.count = b.count;
+    if (b.count == 0) return info;
+
+    float minB = b.base[0], maxB = b.base[0];
+    for (uint8_t i = 1; i < b.count; i++) {
+        if (b.base[i] < minB) minB = b.base[i];
+        if (b.base[i] > maxB) maxB = b.base[i];
+    }
+    info.range  = maxB - minB;
+    info.stable = (b.count >= STABLE_WINDOW) && (info.range <= stableThreshold(param));
+    return info;
+}
+
 bool SensorMath::captureStableValue(uint8_t currentParam, float &capturedVolt, float &capturedTemp) {
-    const int N = 8;
-    float bufBase[N];
+    if (currentParam > 2) return false;
+
+    StabBuf b = _snapshot(currentParam);
+    if (b.count < STABLE_WINDOW) return false;   // ยังเก็บค่าไม่ครบหน้าต่าง
+
+    float minB = b.base[0], maxB = b.base[0];
     float sumVolt = 0.0f, sumTemp = 0.0f;
-    
-    for (int i = 0; i < N; i++) {
-        SensorData s = {0}; // Initialize ป้องกันค่าขยะ
-        if (xQueuePeek(sensorQueue, &s, 0) != pdTRUE) {
-            return false; // ถ้าดึงค่าจากคิวไม่ได้ ถือว่าอ่านค่าไม่สำเร็จ (ป้องกันค่ามั่ว)
-        }
-        
-        float v = 0;
-#if SENSOR_COUNT == 3
-        if (currentParam == 0) v = s.voltEC;
-        else if (currentParam == 1) v = s.voltPH;
-        else v = s.voltDO;
-#else
-        v = s.voltEC;
-#endif
-        
-        float baseVal = 0.0f;
-        if (currentParam == 0) baseVal = calcEC25(v, s.tempC);
-        else if (currentParam == 1) baseVal = calcPHBase(v, s.tempC);
-        else baseVal = calcDOBase(v, s.tempC);
-        
-        bufBase[i] = baseVal;
-        sumVolt += v;
-        sumTemp += s.tempC;
-        
-        vTaskDelay(pdMS_TO_TICKS(80)); 
+    for (uint8_t i = 0; i < STABLE_WINDOW; i++) {
+        if (b.base[i] < minB) minB = b.base[i];
+        if (b.base[i] > maxB) maxB = b.base[i];
+        sumVolt += b.volt[i];
+        sumTemp += b.temp[i];
     }
-    
-    float minB = bufBase[0], maxB = bufBase[0];
-    for (int i = 0; i < N; i++) {
-        if (bufBase[i] < minB) minB = bufBase[i];
-        if (bufBase[i] > maxB) maxB = bufBase[i];
+
+    if ((maxB - minB) > stableThreshold(currentParam)) {
+        return false;                            // ยังแกว่งเกินเกณฑ์
     }
-    
-    float threshold = (currentParam == 1) ? 0.2f : 0.5f;
-    if ((maxB - minB) > threshold) {
-        return false; 
-    }
-    
-    capturedVolt = sumVolt / N;
-    capturedTemp = sumTemp / N;
+
+    capturedVolt = sumVolt / STABLE_WINDOW;
+    capturedTemp = sumTemp / STABLE_WINDOW;
     return true;
 }

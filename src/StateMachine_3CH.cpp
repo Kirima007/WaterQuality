@@ -240,17 +240,34 @@ void StateMachine::_handleEditThresh(ButtonEvent ev) {
         else if (currentParam == 1) t = &NVSManager::threshPH;
         else t = &NVSManager::threshDO;
 
-        if (editingColor == 'G') {
-            t->green += step;
-            t->green = constrain(t->green, 0.0f, t->yellow - 0.1f);
-        } 
-        else if (editingColor == 'Y') {
-            t->yellow += step;
-            t->yellow = constrain(t->yellow, t->green + 0.1f, t->red - 0.1f);
-        }
-        else {
-            t->red += step;
-            t->red = constrain(t->red, t->yellow + 0.1f, 100.0f);
+        if (currentParam == 2) {
+            // สำหรับ DO เป็นการเตือนขีดจำกัดล่าง (Red < Yellow < Green)
+            if (editingColor == 'R') {
+                t->red += step;
+                t->red = constrain(t->red, 0.0f, t->yellow - 0.1f);
+            } 
+            else if (editingColor == 'Y') {
+                t->yellow += step;
+                t->yellow = constrain(t->yellow, t->red + 0.1f, t->green - 0.1f);
+            }
+            else {
+                t->green += step;
+                t->green = constrain(t->green, t->yellow + 0.1f, 100.0f);
+            }
+        } else {
+            // สำหรับ Salinity และ pH เป็นการเตือนขีดจำกัดบน (Green < Yellow < Red)
+            if (editingColor == 'G') {
+                t->green += step;
+                t->green = constrain(t->green, 0.0f, t->yellow - 0.1f);
+            } 
+            else if (editingColor == 'Y') {
+                t->yellow += step;
+                t->yellow = constrain(t->yellow, t->green + 0.1f, t->red - 0.1f);
+            }
+            else {
+                t->red += step;
+                t->red = constrain(t->red, t->yellow + 0.1f, 100.0f);
+            }
         }
     } else if (ev == ButtonEvent::SHORT_PRESS) {
         requestSound(SoundEvent::BACK);
@@ -423,7 +440,9 @@ void StateMachine::_handleEditCalManual(ButtonEvent ev) {
 
         if (editingColor == 'A') {
             c->alpha += step;
-            if (c->alpha < 0.001f) c->alpha = 0.001f;
+            if (fabsf(c->alpha) < 0.001f) {
+                c->alpha = (step > 0) ? 0.001f : -0.001f;
+            }
         } else {
             c->beta += step;
         }
@@ -438,7 +457,7 @@ void StateMachine::_handleCalDI(ButtonEvent ev, const SensorData& sensor) {
     if (ev == ButtonEvent::LONG_PRESS) {
         if (SensorMath::captureStableValue(currentParam, tmp_v_di, tmp_t_di)) {
             requestSound(SoundEvent::SUCCESS);
-            _goTo(AppState::CAL_SALT);
+            _goTo(AppState::CAL_SALT); // บังคับให้ทุกเซ็นเซอร์ไปคาลิเบรตจุดที่ 2
         } else {
             requestSound(SoundEvent::BACK); 
         }
