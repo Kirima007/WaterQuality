@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <esp_task_wdt.h>
 
 #include "config.h"
 #include "shared.h"
@@ -56,7 +57,7 @@
 // ==========================================
 // Objects
 // ==========================================
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+LiquidCrystal_I2C lcd(LCD_I2C_ADDR, 20, 4);
 SoundManager      soundMgr(BUZZER);
 RotaryInput       rotary(ENC_CLK, ENC_DT, ENC_SW);
 StateMachine      stateMachine;
@@ -92,6 +93,17 @@ void displayTask(void* param) {
 // SETUP
 // ==========================================
 void setup() {
+    // --- Task Watchdog ---
+    // ไม่ให้ WDT เฝ้า IDLE task (เหมือนที่ disableCore0WDT() ตั้งใจไว้เดิม)
+    // แต่ใช้ reconfigure เพื่อให้ถอด idle hook ออกด้วย → ไม่มี log "task not found" รัว
+    // TODO: เมื่อแก้ TinyGSM busy-wait แล้ว (TINY_GSM_YIELD_MS) ค่อยเปิดเฝ้า IDLE0 กลับ (idle_core_mask = 1)
+    esp_task_wdt_config_t wdtCfg = {
+        .timeout_ms     = 5000,   // เท่าค่าเดิมใน sdkconfig
+        .idle_core_mask = 0,      // ไม่เฝ้า IDLE ทั้งสอง core
+        .trigger_panic  = true,   // ถ้ามี task ที่ subscribe ค้าง → panic + backtrace
+    };
+    esp_task_wdt_reconfigure(&wdtCfg);
+
     // --- I2C ---
     Wire.begin(21, 22);
 

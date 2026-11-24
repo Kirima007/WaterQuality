@@ -258,6 +258,7 @@ void StateMachine::_handleCalMenu(ButtonEvent ev) {
                 break;
             case 1:  // Manual Calibrate
                 requestSound(SoundEvent::SELECT);
+                _calibBackup = NVSManager::calibEC; // สำรองค่าเดิมไว้ เผื่อผู้ใช้กด Cancel
                 menuIndex = 0;
                 _goTo(AppState::CAL_MANUAL);
                 break;
@@ -371,7 +372,8 @@ void StateMachine::_handleCalManual(ButtonEvent ev, const SensorData& sensor) {
                 requestSound(SoundEvent::BACK);
                 break;
             case 3: // Cancel
-                NVSManager::load(); // หากกด Back ให้โหลดค่าเดิมกลับมาทับค่าใหม่ที่ยังไม่ได้บันทึก
+                // คืนค่าเดิมจากที่สำรองไว้ (ไม่อ่าน NVS ใหม่ → เร็ว ไม่กิน stack ไม่ทับค่าอื่น)
+                NVSManager::calibEC = _calibBackup;
                 menuIndex = 1;
                 _goTo(AppState::CAL_MENU);
                 requestSound(SoundEvent::BACK);

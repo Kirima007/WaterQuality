@@ -84,17 +84,20 @@ void WifiTask::taskEntry(void* param) {
 
     SensorData sensor{};
     GPSData    gps{};
-    unsigned long lastWifiCheck = 0;
+    unsigned long lastWifiAttempt = 0;
+    bool wifiStarted = false;                    // สั่ง WiFi.begin() ไปแล้วหรือยัง
+    const unsigned long WIFI_RETRY_MS = 30000;   // ต่อไม่ติดนานเกินนี้ ค่อยเริ่มเชื่อมต่อใหม่
 
     for (;;) {
         // --- 1. เช็คว่าผู้ใช้เปิดโหมด Wi-Fi อยู่ไหม ---
-        // ถ้าใช้โหมด SIM อยู่ ให้ Task นี้ตัดการเชื่อมต่อและหลับไปเลย
+        // ถ้าใช้โหมด SIM อยู่ ให้ปิด Wi-Fi (รวมกรณีที่ยังต่อไม่ติดแต่กำลังพยายามอยู่) แล้วหลับไป
         if (NVSManager::config.networkMode == NET_MODE_SIM) {
-            if (WiFi.status() == WL_CONNECTED) {
+            if (wifiStarted) {
                 WiFi.disconnect(true);
                 WiFi.mode(WIFI_OFF);
-                _connected = false;
+                wifiStarted = false;
             }
+            _connected = false;
             vTaskDelay(pdMS_TO_TICKS(1000)); // หลับยาวๆ ไม่กวนระบบ
             continue;
         }
@@ -102,19 +105,34 @@ void WifiTask::taskEntry(void* param) {
         // --- 2. ระบบเชื่อมต่อ Wi-Fi ---
         if (WiFi.status() != WL_CONNECTED) {
             _connected = false;
-            // พยายามต่อ Wi-Fi ทุกๆ 5 วินาที
-            if (millis() - lastWifiCheck > 5000) {
+
+            if (!wifiStarted) {
+                // เริ่มเชื่อมต่อครั้งแรก — ให้ระบบ reconnect เองอัตโนมัติเมื่อหลุด
                 Serial.println("[WIFI] Connecting to Hotspot...");
                 WiFi.mode(WIFI_STA);
+                WiFi.setAutoReconnect(true);
                 WiFi.begin(WIFI_SSID, WIFI_PASS); // ดึงชื่อ/รหัส จาก Config.h
                 // ลดกำลังส่งเพื่อลดกระแสพีค (เดิม 19.5 dBm) — ตั้งหลัง begin() เพื่อให้ค่าไม่ถูกรีเซ็ตทับ
                 // ถ้า Hotspot อยู่ไกลแล้วต่อไม่ติด ค่อยขยับขึ้นเป็น WIFI_POWER_15dBm
                 WiFi.setTxPower(WIFI_POWER_13dBm);
-                lastWifiCheck = millis();
+                wifiStarted = true;
+                lastWifiAttempt = millis();
             }
+            else if (millis() - lastWifiAttempt > WIFI_RETRY_MS) {
+                // ต่อไม่ติดนานเกิน 30 วิ → เริ่มใหม่แบบสะอาด
+                // ต้อง disconnect ก่อน ไม่งั้นได้ error "sta is connecting, cannot set config"
+                Serial.println("[WIFI] Retry connecting...");
+                WiFi.disconnect();
+                vTaskDelay(pdMS_TO_TICKS(100));
+                WiFi.begin(WIFI_SSID, WIFI_PASS);
+                WiFi.setTxPower(WIFI_POWER_13dBm);
+                lastWifiAttempt = millis();
+            }
+            // นอกนั้น: กำลังเชื่อมต่ออยู่ ปล่อยให้มันทำงานไป ไม่สั่ง begin() ซ้ำ
         } else {
             _connected = true;
             _signalQuality = WiFi.RSSI(); // ความแรงสัญญาณ Wi-Fi
+            lastWifiAttempt = millis();   // ถ้าหลุด ให้ auto-reconnect ทำงานก่อน 30 วิ ค่อยบังคับเริ่มใหม่
         }
 
         // --- 3. ตรวจสอบคำสั่งให้ส่งข้อมูล Sensor ---

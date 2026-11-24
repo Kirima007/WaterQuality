@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
+#include <Wire.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "shared.h"
@@ -8,6 +9,8 @@
 #include "NVSManager.h"
 
 #define DISPLAY_TASK_DELAY_MS  25    // วาด LCD ทุก 25ms (40fps)
+#define LCD_I2C_ADDR           0x27  // Address ของจอ LCD (PCF8574)
+#define LCD_RETRY_MS           3000  // ถ้าไม่เจอจอ ลองหาใหม่ทุกกี่ ms
 
 class ScreenManager {
 public:
@@ -21,6 +24,34 @@ public:
 private:
     LiquidCrystal_I2C& _lcd;
     StateMachine&      _sm;
+
+    // สถานะจอ: ถ้าไม่ได้ต่อจอ จะไม่เขียน I2C เลย (กัน log error รัวเป็นพันบรรทัด)
+    bool     _lcdOk        = false;
+    uint32_t _lcdLastProbe = 0;
+
+    // ส่ง address ไปถามว่ามีจออยู่ไหม (transaction เดียว ใช้เวลาไม่ถึง 1ms)
+    bool _probeLcd() {
+        Wire.beginTransmission(LCD_I2C_ADDR);
+        return Wire.endTransmission() == 0;
+    }
+
+    // true = จอพร้อมวาด
+    // - จอต่ออยู่: เช็คทุกรอบ (จับได้ทันทีถ้าจอหลุดกลางทาง)
+    // - จอไม่ได้ต่อ: ลองหาใหม่ทุก LCD_RETRY_MS, เจอแล้ว init ใหม่อัตโนมัติ
+    bool _lcdReady() {
+        uint32_t now = millis();
+        if (_lcdOk || (now - _lcdLastProbe >= LCD_RETRY_MS)) {
+            _lcdLastProbe = now;
+            bool found = _probeLcd();
+            if (found && !_lcdOk) {
+                _lcd.init();
+                _lcd.backlight();
+                _lcd.clear();
+            }
+            _lcdOk = found;
+        }
+        return _lcdOk;
+    }
 
     // ข้อมูลล่าสุดจาก Queue
     SensorData _sensor{};

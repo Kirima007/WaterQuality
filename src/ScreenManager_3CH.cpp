@@ -13,9 +13,14 @@ ScreenManager::ScreenManager(LiquidCrystal_I2C& lcd, StateMachine& sm)
     : _lcd(lcd), _sm(sm) {}
 
 void ScreenManager::begin() {
-    _lcd.init();
-    _lcd.backlight();
-    _lcd.clear();
+    // เช็คก่อนว่ามีจอต่ออยู่ไหม ถ้าไม่มีจะไม่ init (กัน log error) แล้วให้ task ลองหาใหม่เอง
+    _lcdOk = _probeLcd();
+    _lcdLastProbe = millis();
+    if (_lcdOk) {
+        _lcd.init();
+        _lcd.backlight();
+        _lcd.clear();
+    }
 }
 
 // ==========================================
@@ -26,6 +31,12 @@ void ScreenManager::taskEntry(void* param) {
 
     for (;;) {
         self->_updateData();
+
+        // ไม่ได้ต่อจอ → ข้ามการวาดทั้งหมด ไม่เขียน I2C
+        if (!self->_lcdReady()) {
+            vTaskDelay(pdMS_TO_TICKS(DISPLAY_TASK_DELAY_MS));
+            continue;
+        }
 
         if (self->_sm.hasChanged()) {
             self->_lcd.clear();

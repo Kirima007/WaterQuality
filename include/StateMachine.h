@@ -92,6 +92,8 @@ public:
     void onOtaDownloadFailed();
 
 private:
+    CalibData _calibBackup;  // สำรองค่า calib ตอนเข้าหน้า Manual Calibrate (ใช้คืนค่าเมื่อกด Cancel)
+
     AppState _current;
     AppState _prev;
     AppState _returnState;   // จำไว้ว่าต้องกลับไปหน้าไหนหลังส่งเสร็จ

@@ -75,9 +75,12 @@ void SensorTask::taskEntry(void* param) {
 
         data.timestamp = millis();
         
-        // Re-check ADS if it was not found initially (optional but safer)
-        if (!data.adsValid) {
+        // ถ้าหา ADS ไม่เจอ ให้ลองหาใหม่ทุก 10 วินาที (เดิมทุกรอบ ~1 วิ ทำให้ log error รัว)
+        static uint32_t lastAdsRetry = 0;
+        if (!data.adsValid && (millis() - lastAdsRetry >= 10000)) {
+            lastAdsRetry = millis();
             data.adsValid = ads.begin();
+            if (data.adsValid) ads.setGain(GAIN_ONE);
         }
 
         if (data.adsValid) {

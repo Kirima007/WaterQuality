@@ -72,9 +72,17 @@ static bool _doPost(const String& path, const String& payload, StateMachine* sm,
 // FreeRTOS Task Entry Point
 // ==========================================
 void SimTask::taskEntry(void* param) {
-    disableCore0WDT();
+    // หมายเหตุ: เดิมเรียก disableCore0WDT() ตรงนี้ แต่ใน Arduino core 3.x มันถอด IDLE0 ออกจาก WDT
+    // โดยไม่ถอด idle hook ทำให้ log "esp_task_wdt_reset: task not found" รัว → ย้ายไปตั้งค่าใน setup() แทน
     StateMachine* sm = static_cast<StateMachine*>(param);
     modemMutex = xSemaphoreCreateMutex();
+
+#ifdef TEST_NO_MODEM
+    // [ทดสอบชั่วคราว] ไม่จ่ายไฟให้ SIM800L เพื่อดูว่าอาการ reset หายไหม
+    pinMode(MODEM_POWER_ON, OUTPUT);
+    digitalWrite(MODEM_POWER_ON, LOW);
+    for (;;) vTaskDelay(portMAX_DELAY);
+#endif
 
     // --- เปิด SIM800L ---
     pinMode(MODEM_PWRKEY,   OUTPUT);
