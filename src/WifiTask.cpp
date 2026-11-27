@@ -1,6 +1,7 @@
 #include "WifiTask.h"
 #include "StateMachine.h"
 #include "NVSManager.h"
+#include "ResetLog.h"
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <ArduinoHttpClient.h>
@@ -317,6 +318,10 @@ String WifiTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonObject address = doc["address"].to<JsonObject>();
     address["x"] = String(gps.lat, 6);
     address["y"] = String(gps.lng, 6);
+
+    // สาเหตุรีเซตรอบนี้ + จำนวนรีเซตผิดปกติสะสม (ดูเครื่องในสนามได้จาก server)
+    doc["rst"]     = ResetLog::reasonName();
+    doc["rst_err"] = ResetLog::errorCount();
 
     String payload;
     serializeJson(doc, payload);

@@ -1,9 +1,18 @@
 #include "ScreenManager.h"
 #include "SimTask.h"
+#include "ResetLog.h"
 
 #if SENSOR_COUNT == 1
 
 static uint32_t lastGpsValidTime = 0;
+
+// พิมพ์ข้อความเต็มแถว: ตัดที่ 20 ตัว + เติมช่องว่างให้ครบ (กันข้อความล้นไปแถวอื่น และกันตัวอักษรเก่าค้าง)
+static void _printRow(LiquidCrystal_I2C& lcd, uint8_t row, const char* text) {
+    char line[21];
+    snprintf(line, sizeof(line), "%-20.20s", text);
+    lcd.setCursor(0, row);
+    lcd.print(line);
+}
 
 // ==========================================
 // Constructor
@@ -117,34 +126,20 @@ void ScreenManager::_drawStartup() {
 }
 
 void ScreenManager::_drawMainScreen() {
-    _lcd.setCursor(0, 0);
-    _lcd.print("SAL : ");
-    if (_sensor.adsValid) {
-        _printPadded(_sensor.valPPT, 2, 5); 
-        _lcd.print(" ppt     ");
-    } else {
-        _lcd.print("ERR       ");
-    }
+    // ใช้ _printRow ทุกแถว กันตัวเลขยาวเกินแล้วล้นไปแถวอื่น
+    char row[32];
+    if (_sensor.adsValid) snprintf(row, sizeof(row), "SAL : %5.2f ppt", _sensor.valPPT);
+    else                  snprintf(row, sizeof(row), "SAL : ERR");
+    _printRow(_lcd, 0, row);
 
-    _lcd.setCursor(0, 1);
-    _lcd.print("EC  : ");
-    if (_sensor.adsValid) {
-        _printPadded(_sensor.valEC, 2, 5); 
-        _lcd.print(" mS/cm   ");
-    } else {
-        _lcd.print("ERR       ");
-    }
+    if (_sensor.adsValid) snprintf(row, sizeof(row), "EC  : %5.2f mS/cm", _sensor.valEC);
+    else                  snprintf(row, sizeof(row), "EC  : ERR");
+    _printRow(_lcd, 1, row);
 
-    _lcd.setCursor(0, 2);
-    _lcd.print("Temp: ");
-    if (_sensor.tempValid) {
-        _printPadded(_sensor.tempC, 1, 5);
-        _lcd.print(" ");
-        _lcd.print((char)223); // สัญลักษณ์องศา (°)
-        _lcd.print("C      ");
-    } else {
-        _lcd.print("ERR       ");
-    }
+    // (char)223 = สัญลักษณ์องศา (°)
+    if (_sensor.tempValid) snprintf(row, sizeof(row), "Temp: %5.1f %cC", _sensor.tempC, (char)223);
+    else                   snprintf(row, sizeof(row), "Temp: ERR");
+    _printRow(_lcd, 2, row);
     String netPrefix;
     String netStatus;
     
@@ -355,10 +350,9 @@ void ScreenManager::_drawEditThresh() {
         val = NVSManager::thresh.red;
     }
 
-    _lcd.setCursor(0, 2);
-    _lcd.print("      [");
-    _printPadded(val, 1, 5); 
-    _lcd.print("]       ");
+    char row[32];
+    snprintf(row, sizeof(row), "      [%5.1f]", val);
+    _printRow(_lcd, 2, row);
 
     _lcd.setCursor(0, 3);
     _lcd.print("   Click to Save    ");
@@ -421,25 +415,25 @@ void ScreenManager::_drawSystemInfo() {
     snprintf(buf, sizeof(buf), "Firmware  : %-12.12s", FW_VERSION); 
     _lcd.print(buf);
 
-    // บรรทัด 4: เครดิต
-    _lcd.setCursor(0, 3);
-    _lcd.print("By AIOT LAB (KMITL) "); 
+    // บรรทัด 4: สลับทุก 3 วินาที ระหว่างเครดิตเดิม กับ สาเหตุรีเซตรอบนี้ + จำนวนรีเซตผิดปกติสะสม
+    if ((millis() / 3000) % 2 == 0) {
+        _lcd.setCursor(0, 3);
+        _lcd.print("By AIOT LAB (KMITL) ");
+    } else {
+        char row[32];
+        snprintf(row, sizeof(row), "Rst:%-8.8s Err:%lu", ResetLog::reasonName(), (unsigned long)ResetLog::errorCount());
+        _printRow(_lcd, 3, row);
+    }
 }
 
 
 void ScreenManager::_drawCalmanual() {
     int idx = _sm.menuIndex;
-    _lcd.setCursor(0, 0);
-    _lcd.print(idx == 0 ? "> " : "  ");
-    _lcd.print("Alpha : ");
-    _printPadded(NVSManager::calibEC.alpha, 3, 5);
-    _lcd.print("     ");
-
-    _lcd.setCursor(0, 1);
-    _lcd.print(idx == 1 ? "> " : "  ");
-    _lcd.print("Beta  : ");
-    _printPadded(NVSManager::calibEC.beta, 3, 5);
-    _lcd.print("     ");
+    char row[32];
+    snprintf(row, sizeof(row), "%sAlpha : %5.3f", idx == 0 ? "> " : "  ", NVSManager::calibEC.alpha);
+    _printRow(_lcd, 0, row);
+    snprintf(row, sizeof(row), "%sBeta  : %5.3f", idx == 1 ? "> " : "  ", NVSManager::calibEC.beta);
+    _printRow(_lcd, 1, row);
 
     _lcd.setCursor(0, 2);
     _lcd.print(idx == 2 ? "> Save And Send     " : "  Save And Send     ");
@@ -456,16 +450,12 @@ void ScreenManager::_drawEditCalManual() {
         _lcd.print("-  Beta (B) Offset -");
     }
 
-    _lcd.setCursor(0, 1);
     float val = (_sm.editingColor == 'A') ? NVSManager::calibEC.alpha : NVSManager::calibEC.beta;
-    _lcd.print(" Value  : [");
-    _printPadded(val, 3, 6);
-    _lcd.print("] ");
-
-    _lcd.setCursor(0, 2);
-    _lcd.print(" Current: ");
-    _printPadded(_sensor.valPPT, 2, 5);
-    _lcd.print(" ppt ");
+    char row[32];
+    snprintf(row, sizeof(row), " Value  : [%6.3f]", val);
+    _printRow(_lcd, 1, row);
+    snprintf(row, sizeof(row), " Current: %5.2f ppt", _sensor.valPPT);
+    _printRow(_lcd, 2, row);
 
     _lcd.setCursor(0, 3);
     _lcd.print("  Click to Confirm  ");
@@ -476,7 +466,7 @@ void ScreenManager::_drawCal1() {
     _lcd.setCursor(0, 0);
     _lcd.print("1. Insert Water     "); 
     _lcd.setCursor(0, 1);
-    _lcd.print("Target: 0.0 us/cm ");
+    _lcd.print("Target: 0.00 mS/cm  ");
     _lcd.setCursor(0, 2);
     snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.voltEC, _sensor.tempC);
     _lcd.print(buf);
@@ -489,7 +479,7 @@ void ScreenManager::_drawCal2() {
     _lcd.setCursor(0, 0);
     _lcd.print("2. Insert Water     "); 
     _lcd.setCursor(0, 1);
-    _lcd.print("Target: 12.88 ms/cm ");
+    _lcd.print("Target: 12.88 mS/cm ");
     _lcd.setCursor(0, 2);
     snprintf(buf, sizeof(buf), "V:%-7.4f T:%-5.1fC", _sensor.voltEC, _sensor.tempC);
     _lcd.print(buf);
@@ -583,13 +573,13 @@ void ScreenManager::_drawSimResult() {
         _lcd.setCursor(0, 1); _lcd.print(" Send Success!  OK  ");
         _lcd.setCursor(0, 2);
         char buf[21];
-        sprintf(buf, " HTTP: %-12d", _sm.simLastHttpCode);
+        snprintf(buf, sizeof(buf), " HTTP: %-12d", _sm.simLastHttpCode);
         _lcd.print(buf);
     } else {
         _lcd.setCursor(0, 1); _lcd.print(" Send Failed!  X    ");
         _lcd.setCursor(0, 2);
         char buf[21];
-        sprintf(buf, " HTTP: %-5d Retry  ", _sm.simLastHttpCode);
+        snprintf(buf, sizeof(buf), " HTTP: %-5d Retry  ", _sm.simLastHttpCode);
         _lcd.print(buf);
     }
     _lcd.setCursor(0, 3); _lcd.print(" Click to go back   ");
@@ -656,17 +646,19 @@ void ScreenManager::_drawOtaChecking() {
 
 void ScreenManager::_drawOtaResult() {
     _lcd.setCursor(0, 0); _lcd.print("--- FW Update ------");
+    char row[32];
     if (!_sm.otaCheckSuccess) {
         _lcd.setCursor(0, 1); _lcd.print("Check Failed!       ");
         _lcd.setCursor(0, 2); _lcd.print("Cannot connect svr. ");
         _lcd.setCursor(0, 3); _lcd.print("Click to go back    ");
     } else if (_sm.otaHasUpdate) {
-        _lcd.setCursor(0, 1); _lcd.print("New: "); _lcd.print(_sm.otaLatestVersion);
-        _lcd.setCursor(0, 2); _lcd.print("Cur: "); _lcd.print(FW_VERSION);
+        // เวอร์ชันมาจาก server ความยาวไม่แน่นอน → ตัดที่ 15 ตัว
+        snprintf(row, sizeof(row), "New: %.15s", _sm.otaLatestVersion.c_str()); _printRow(_lcd, 1, row);
+        snprintf(row, sizeof(row), "Cur: %.15s", FW_VERSION);                    _printRow(_lcd, 2, row);
         _lcd.setCursor(0, 3); _lcd.print("Hold 10s to Update! ");
     } else {
         _lcd.setCursor(0, 1); _lcd.print("System is up to date");
-        _lcd.setCursor(0, 2); _lcd.print("Cur: "); _lcd.print(FW_VERSION);
+        snprintf(row, sizeof(row), "Cur: %.15s", FW_VERSION);                    _printRow(_lcd, 2, row);
         _lcd.setCursor(0, 3); _lcd.print("Click to go back    ");
     }
 }

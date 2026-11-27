@@ -3,6 +3,7 @@
 
 #include "SimTask.h"
 #include "StateMachine.h"
+#include "ResetLog.h"
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
 #include <ArduinoJson.h>
@@ -69,6 +70,43 @@ static bool _doPost(const String& path, const String& payload, StateMachine* sm,
 }
 
 // ==========================================
+// Helper: เปิด / ปิดไฟ SIM800L
+// GPIO23 (MODEM_POWER_ON) คือขา EN ของ buck ~4V ที่จ่ายไฟ VBAT ให้ SIM800L (ดู schematic T-Call V1.4)
+// ==========================================
+static void _modemPowerOn() {
+    Serial.println("[SIM800L] Power ON");
+    pinMode(MODEM_PWRKEY,   OUTPUT);
+    pinMode(MODEM_RST,      OUTPUT);
+    pinMode(MODEM_POWER_ON, OUTPUT);
+    digitalWrite(MODEM_PWRKEY,   LOW);
+    digitalWrite(MODEM_RST,      HIGH);
+    digitalWrite(MODEM_POWER_ON, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    simSerial.begin(9600, SERIAL_8N1, MODEM_RX, MODEM_TX);
+    vTaskDelay(pdMS_TO_TICKS(3000));
+
+    if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
+        modem.restart();
+        xSemaphoreGive(modemMutex);
+    }
+    vTaskDelay(pdMS_TO_TICKS(2000));
+}
+
+static void _modemPowerOff() {
+    Serial.println("[SIM800L] Power OFF (WiFi mode)");
+    if (xSemaphoreTake(modemMutex, portMAX_DELAY) == pdTRUE) {
+        modem.poweroff();   // AT+CPOWD=1: ปิดแบบปกติ ออกจากเครือข่ายเรียบร้อยก่อนตัดไฟ
+        xSemaphoreGive(modemMutex);
+    }
+    simSerial.end();
+    // ไม่ปล่อยขาสัญญาณค้าง HIGH เข้า SIM800L ที่ไม่มีไฟ (กันไฟย้อนเข้าทางขา I/O)
+    pinMode(MODEM_TX,  INPUT);
+    pinMode(MODEM_RST, INPUT);
+    digitalWrite(MODEM_POWER_ON, LOW);
+}
+
+// ==========================================
 // FreeRTOS Task Entry Point
 // ==========================================
 void SimTask::taskEntry(void* param) {
@@ -84,20 +122,11 @@ void SimTask::taskEntry(void* param) {
     for (;;) vTaskDelay(portMAX_DELAY);
 #endif
 
-    // --- เปิด SIM800L ---
-    pinMode(MODEM_PWRKEY,   OUTPUT);
-    pinMode(MODEM_RST,      OUTPUT);
+    // --- เริ่มต้นปิดไฟ SIM800L ไว้ก่อน แล้วค่อยเปิดเมื่ออยู่โหมด SIM ---
+    // (เดิมเปิดตลอดแม้อยู่โหมด Wi-Fi → SIM800L ลงทะเบียนเครือข่ายและกระชากไฟเป็นระยะโดยไม่จำเป็น)
     pinMode(MODEM_POWER_ON, OUTPUT);
-    digitalWrite(MODEM_PWRKEY,   LOW);
-    digitalWrite(MODEM_RST,      HIGH);
-    digitalWrite(MODEM_POWER_ON, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-
-    simSerial.begin(9600, SERIAL_8N1, MODEM_RX, MODEM_TX);
-    vTaskDelay(pdMS_TO_TICKS(3000));
-
-    modem.restart();
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    digitalWrite(MODEM_POWER_ON, LOW);
+    bool modemOn = false;
 
     // ==========================================
     // Main Loop
@@ -107,14 +136,26 @@ void SimTask::taskEntry(void* param) {
     int failCount = 0; // ตัวนับสำหรับทำ Hard Reset
 
     for (;;) {
-        
+
         if (NVSManager::config.networkMode == NET_MODE_WIFI) {
-            // ถ้าใช้ Wi-Fi อยู่ ให้ SIM พักการทำงานและล้างคำสั่งทิ้งไปเลย
+            // ถ้าใช้ Wi-Fi อยู่ ให้ปิดไฟ SIM800L และล้างคำสั่งทิ้งไปเลย
+            if (modemOn) {
+                _modemPowerOff();
+                modemOn = false;
+            }
             _connected = false;
+            _signalQuality = 0;
             _sendRequested = false;
             _sendCalibRequested = false;
-            vTaskDelay(pdMS_TO_TICKS(1000)); 
+            vTaskDelay(pdMS_TO_TICKS(1000));
             continue; // ข้ามการทำงานรอบนี้ไปเลย
+        }
+
+        // โหมด SIM: เปิดไฟ SIM800L ถ้ายังไม่เปิด (ตอนบูต หรือเพิ่งสลับจาก Wi-Fi)
+        if (!modemOn) {
+            _modemPowerOn();
+            modemOn = true;
+            failCount = 0;
         }
 
         bool networkOk = false;
@@ -221,6 +262,10 @@ String SimTask::_buildJson(const SensorData& sensor, const GPSData& gps) {
     JsonObject address = doc["address"].to<JsonObject>();
     address["x"] = String(gps.lat, 6);
     address["y"] = String(gps.lng, 6);
+
+    // สาเหตุรีเซตรอบนี้ + จำนวนรีเซตผิดปกติสะสม (ดูเครื่องในสนามได้จาก server)
+    doc["rst"]     = ResetLog::reasonName();
+    doc["rst_err"] = ResetLog::errorCount();
 
     String payload;
     serializeJson(doc, payload);

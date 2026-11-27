@@ -232,11 +232,15 @@ Readings are sent as an HTTP `POST` of JSON to `HTTP_PATH`:
   "salinity": 12.35,
   "ph": 7.02,
   "o2": 6.80,
-  "address": { "x": "13.729900", "y": "100.775800" }
+  "address": { "x": "13.729900", "y": "100.775800" },
+  "rst": "POWERON",
+  "rst_err": 0
 }
 ```
 
 `ph` and `o2` are sent by 3-channel devices only. Calibration events are posted to `/api/calibrate/{salinity|ph|o2}`.
+
+`rst` is the reason for the device's most recent boot (`POWERON`, `SW`, `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`, `BROWNOUT`, …). `rst_err` is the running count of abnormal resets, stored in NVS namespace `rst_log`. A factory reset does not clear it.
 
 ---
 
@@ -265,6 +269,8 @@ The device fetches `HTTP_PATH_OTA_VERSION`, which must return:
 | LCD blank, everything else running | LCD not detected at `0x27` | Check wiring; the LCD is re-detected every 3 s |
 | All readings show 0 | ADS1115 not detected | Check the I2C wiring; the ADC is re-detected every 10 s |
 | Upload fails: `Wrong boot mode (0x13)` | Auto-reset circuit not entering download mode | Hold GPIO0 to GND while resetting |
+
+Every boot logs its reset reason and counters to serial (`[RESET] reason=... boots=... errors=...`). **System Info** alternates its last line with `Rst:<reason> Err:<count>`.
 
 To read a crash, open the serial monitor at 115200 baud and decode the backtrace:
 

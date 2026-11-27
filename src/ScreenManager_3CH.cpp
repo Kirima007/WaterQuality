@@ -1,10 +1,19 @@
 #include "ScreenManager.h"
 #include "SimTask.h"
 #include "SensorMath.h"
+#include "ResetLog.h"
 
 #if SENSOR_COUNT == 3
 
 static uint32_t lastGpsValidTime = 0;
+
+// พิมพ์ข้อความเต็มแถว: ตัดที่ 20 ตัว + เติมช่องว่างให้ครบ (กันข้อความล้นไปแถวอื่น และกันตัวอักษรเก่าค้าง)
+static void _printRow(LiquidCrystal_I2C& lcd, uint8_t row, const char* text) {
+    char line[21];
+    snprintf(line, sizeof(line), "%-20.20s", text);
+    lcd.setCursor(0, row);
+    lcd.print(line);
+}
 
 // ==========================================
 // Constructor
@@ -110,44 +119,36 @@ void ScreenManager::_drawStartup() {
 }
 
 void ScreenManager::_drawMainScreen() {
-    // Row 0 & 1: Values
+    // Row 0 & 1: Values (ใช้ _printRow ทุกแถว กันตัวเลขยาวเกินแล้วล้นไปแถวอื่น)
+    char row[32];
+    const bool ok = _sensor.adsValid;
     if (_sm.currentParam == 0) {
-        _lcd.setCursor(0, 0); _lcd.print("SAL : "); 
-        if (_sensor.adsValid) { _printPadded(_sensor.valPPT, 2, 5); _lcd.print(" ppt     "); }
-        else { _lcd.print("ERR       "); }
-
-        _lcd.setCursor(0, 1); _lcd.print("EC  : "); 
-        if (_sensor.adsValid) { _printPadded(_sensor.valEC, 2, 5); _lcd.print(" mS/cm   "); }
-        else { _lcd.print("ERR       "); }
+        if (ok) snprintf(row, sizeof(row), "SAL : %5.2f ppt", _sensor.valPPT);
+        else    snprintf(row, sizeof(row), "SAL : ERR");
+        _printRow(_lcd, 0, row);
+        if (ok) snprintf(row, sizeof(row), "EC  : %5.2f mS/cm", _sensor.valEC);
+        else    snprintf(row, sizeof(row), "EC  : ERR");
+        _printRow(_lcd, 1, row);
     } else if (_sm.currentParam == 1) {
-        _lcd.setCursor(0, 0); _lcd.print("pH  : "); 
-        if (_sensor.adsValid) { _printPadded(_sensor.valPH, 2, 5); _lcd.print(" pH      "); }
-        else { _lcd.print("ERR       "); }
-
-        _lcd.setCursor(0, 1); _lcd.print("Volt: "); 
-        if (_sensor.adsValid) { _printPadded(_sensor.voltPH, 3, 5); _lcd.print(" V       "); }
-        else { _lcd.print("ERR       "); }
+        if (ok) snprintf(row, sizeof(row), "pH  : %5.2f pH", _sensor.valPH);
+        else    snprintf(row, sizeof(row), "pH  : ERR");
+        _printRow(_lcd, 0, row);
+        if (ok) snprintf(row, sizeof(row), "Volt: %5.3f V", _sensor.voltPH);
+        else    snprintf(row, sizeof(row), "Volt: ERR");
+        _printRow(_lcd, 1, row);
     } else {
-        _lcd.setCursor(0, 0); _lcd.print("DO  : "); 
-        if (_sensor.adsValid) { _printPadded(_sensor.valDO, 2, 5); _lcd.print(" mg/L    "); }
-        else { _lcd.print("ERR       "); }
-
-        _lcd.setCursor(0, 1); _lcd.print("Volt: "); 
-        if (_sensor.adsValid) { _printPadded(_sensor.voltDO, 3, 5); _lcd.print(" V       "); }
-        else { _lcd.print("ERR       "); }
+        if (ok) snprintf(row, sizeof(row), "DO  : %5.2f mg/L", _sensor.valDO);
+        else    snprintf(row, sizeof(row), "DO  : ERR");
+        _printRow(_lcd, 0, row);
+        if (ok) snprintf(row, sizeof(row), "Volt: %5.3f V", _sensor.voltDO);
+        else    snprintf(row, sizeof(row), "Volt: ERR");
+        _printRow(_lcd, 1, row);
     }
 
-    // Row 2: Temp
-    _lcd.setCursor(0, 2);
-    _lcd.print("Temp: ");
-    if (_sensor.tempValid) {
-        _printPadded(_sensor.tempC, 1, 5);
-        _lcd.print(" ");
-        _lcd.print((char)223); // สัญลักษณ์องศา (°)
-        _lcd.print("C      ");
-    } else {
-        _lcd.print("ERR       ");
-    }
+    // Row 2: Temp  ((char)223 = สัญลักษณ์องศา °)
+    if (_sensor.tempValid) snprintf(row, sizeof(row), "Temp: %5.1f %cC", _sensor.tempC, (char)223);
+    else                   snprintf(row, sizeof(row), "Temp: ERR");
+    _printRow(_lcd, 2, row);
 
     // Row 3: Network & GPS Status (Ported from 1CH)
     String netPrefix;
@@ -292,7 +293,9 @@ void ScreenManager::_drawEditThresh() {
     else if (_sm.editingColor == 'Y') { _lcd.print(prefix); _lcd.print("Yellow(Y) limit "); val = t->yellow; } 
     else { _lcd.print(prefix); _lcd.print("Red (R) limit   "); val = t->red; }
 
-    _lcd.setCursor(0, 2); _lcd.print("      ["); _printPadded(val, 1, 5); _lcd.print("]       ");
+    char row[32];
+    snprintf(row, sizeof(row), "      [%5.1f]", val);
+    _printRow(_lcd, 2, row);
     _lcd.setCursor(0, 3); _lcd.print("   Click to Save    ");
 }
 
@@ -336,22 +339,13 @@ void ScreenManager::_drawTempCal() {
     _lcd.setCursor(0, 3); _lcd.print("   Click to Save    ");
 }
 
-// พิมพ์ข้อความเต็มแถว (เติมช่องว่างให้ครบ 20 ตัว กันตัวอักษรเก่าค้าง)
-static void _printRow(LiquidCrystal_I2C& lcd, uint8_t row, const char* text) {
-    char line[21];
-    snprintf(line, sizeof(line), "%-20.20s", text);
-    lcd.setCursor(0, row);
-    lcd.print(line);
-}
-
 // หน้าจอ Calibrate (ใช้ร่วมกันทั้งจุดที่ 1 และ 2)
 //  Row0: 1.Calib pH  Std 4.01
-//  Row1: pH:  4.07 V:2.1934
-//  Row2:  25.3C WAIT  9/15   |  ** STABLE **
+//  Row1: Volt: 2.1934 V
+//  Row2:  25.3C WAIT +-0.06  |  ** STABLE **
 //  Row3: Hold:Save Clk:Cancel
 static void _drawCalLive(LiquidCrystal_I2C& lcd, const SensorData& s, uint8_t param, uint8_t step) {
     static const char* pfx[]      = { "EC", "pH", "DO" };
-    static const char* label[]    = { "EC:", "pH:", "DO:" };
     static const char* stdStep1[] = { "Std 0.00", "Std 4.01", "Std 0%"   };
     static const char* stdStep2[] = { "Std 12.88", "Std 6.86", "Std 100%" };
     if (param > 2) param = 0;
@@ -363,13 +357,12 @@ static void _drawCalLive(LiquidCrystal_I2C& lcd, const SensorData& s, uint8_t pa
              (step == 1) ? stdStep1[param] : stdStep2[param]);
     _printRow(lcd, 0, buf);
 
-    // Row 1: ค่าที่อ่านได้ตอนนี้ + แรงดัน
+    // Row 1: แรงดันดิบอย่างเดียว (ไม่แสดงค่า pH/EC/DO สด เพราะคำนวณจาก α/β ชุดเก่า ทำให้ผู้ใช้สับสน)
     if (s.adsValid) {
-        float val  = (param == 0) ? s.valEC  : (param == 1 ? s.valPH  : s.valDO);
         float volt = (param == 0) ? s.voltEC : (param == 1 ? s.voltPH : s.voltDO);
-        snprintf(buf, sizeof(buf), "%s%6.2f V:%6.4f", label[param], val, volt);
+        snprintf(buf, sizeof(buf), "Volt: %6.4f V", volt);
     } else {
-        snprintf(buf, sizeof(buf), "%s ERR (ADS)", label[param]);
+        snprintf(buf, sizeof(buf), "Volt: ERR (ADS)");
     }
     _printRow(lcd, 1, buf);
 
@@ -380,8 +373,10 @@ static void _drawCalLive(LiquidCrystal_I2C& lcd, const SensorData& s, uint8_t pa
 
     SensorMath::StabilityInfo st = SensorMath::getStability(param);
     char status[16];
-    if (st.count < SensorMath::STABLE_WINDOW) {
-        snprintf(status, sizeof(status), "WAIT %2u/%u", st.count, SensorMath::STABLE_WINDOW);
+    // แสดงช่วงแกว่ง (+-) ตั้งแต่เริ่ม แม้ยังเก็บไม่ครบ 15 ค่า (range คิดจากค่าที่มีอยู่)
+    // STABLE จะขึ้นก็ต่อเมื่อครบ 15 ค่า และแกว่งไม่เกินเกณฑ์ (ตรรกะเดิมใน SensorMath)
+    if (st.count < 2) {
+        snprintf(status, sizeof(status), "WAIT +- ...");
     } else if (!st.stable) {
         snprintf(status, sizeof(status), "WAIT +-%.2f", st.range);
     } else {
@@ -435,8 +430,11 @@ void ScreenManager::_drawCalmanual() {
     const char* pfx = (_sm.currentParam == 0) ? "EC" : (_sm.currentParam == 1 ? "pH" : "DO");
     CalibData* c = (_sm.currentParam == 0) ? &NVSManager::calibEC : (_sm.currentParam == 1 ? &NVSManager::calibPH : &NVSManager::calibDO);
     
-    _lcd.setCursor(0, 0); _lcd.print(_sm.menuIndex == 0 ? "> " : "  "); _lcd.print("Alpha : "); _printPadded(c->alpha, 3, 5); _lcd.print("     ");
-    _lcd.setCursor(0, 1); _lcd.print(_sm.menuIndex == 1 ? "> " : "  "); _lcd.print("Beta  : "); _printPadded(c->beta, 3, 5); _lcd.print("     ");
+    char row[32];
+    snprintf(row, sizeof(row), "%sAlpha : %5.3f", _sm.menuIndex == 0 ? "> " : "  ", c->alpha);
+    _printRow(_lcd, 0, row);
+    snprintf(row, sizeof(row), "%sBeta  : %5.3f", _sm.menuIndex == 1 ? "> " : "  ", c->beta);
+    _printRow(_lcd, 1, row);
     _lcd.setCursor(0, 2); _lcd.print(_sm.menuIndex == 2 ? "> Save And Send     " : "  Save And Send     ");
     _lcd.setCursor(0, 3); _lcd.print(_sm.menuIndex == 3 ? "> Cancel            " : "  Cancel            ");
 
@@ -451,10 +449,11 @@ void ScreenManager::_drawEditCalManual() {
     if (_sm.editingColor == 'A') _lcd.print("  Alpha (A) Multi.  ");
     else _lcd.print("   Beta (B) Offset  ");
     
-    _lcd.setCursor(0, 2);
     CalibData* c = (_sm.currentParam == 0) ? &NVSManager::calibEC : (_sm.currentParam == 1 ? &NVSManager::calibPH : &NVSManager::calibDO);
     float val = (_sm.editingColor == 'A') ? c->alpha : c->beta;
-    _lcd.print("      ["); _printPadded(val, 3, 6); _lcd.print("]     ");
+    char row[32];
+    snprintf(row, sizeof(row), "      [%6.3f]", val);
+    _printRow(_lcd, 2, row);
     
     _lcd.setCursor(0, 3); _lcd.print("  Click to Confirm  ");
 }
@@ -472,13 +471,13 @@ void ScreenManager::_drawSimResult() {
         _lcd.setCursor(0, 1); _lcd.print(" Send Success!  OK  ");
         _lcd.setCursor(0, 2);
         char buf[21];
-        sprintf(buf, " HTTP: %-12d", _sm.simLastHttpCode);
+        snprintf(buf, sizeof(buf), " HTTP: %-12d", _sm.simLastHttpCode);
         _lcd.print(buf);
     } else {
         _lcd.setCursor(0, 1); _lcd.print(" Send Failed!  X    ");
         _lcd.setCursor(0, 2);
         char buf[21];
-        sprintf(buf, " HTTP: %-5d Retry  ", _sm.simLastHttpCode);
+        snprintf(buf, sizeof(buf), " HTTP: %-5d Retry  ", _sm.simLastHttpCode);
         _lcd.print(buf);
     }
     _lcd.setCursor(0, 3); _lcd.print(" Click to go back   ");
@@ -529,7 +528,15 @@ void ScreenManager::_drawSystemInfo() {
     _lcd.setCursor(0, 0); _lcd.print("--- System Info ----");
     _lcd.setCursor(0, 1); snprintf(buf, sizeof(buf), "Dev ID  : %-9d", NVSManager::config.deviceId); _lcd.print(buf);
     _lcd.setCursor(0, 2); snprintf(buf, sizeof(buf), "Firmware: %-10.10s", FW_VERSION); _lcd.print(buf);
-    _lcd.setCursor(0, 3); _lcd.print("By AIOT LAB (KMITL) "); 
+
+    // Row 3: สลับทุก 3 วินาที ระหว่างเครดิตเดิม กับ สาเหตุรีเซตรอบนี้ + จำนวนรีเซตผิดปกติสะสม
+    if ((millis() / 3000) % 2 == 0) {
+        _lcd.setCursor(0, 3); _lcd.print("By AIOT LAB (KMITL) ");
+    } else {
+        char row[32];
+        snprintf(row, sizeof(row), "Rst:%-8.8s Err:%lu", ResetLog::reasonName(), (unsigned long)ResetLog::errorCount());
+        _printRow(_lcd, 3, row);
+    }
 }
 
 // ==========================================
@@ -544,17 +551,19 @@ void ScreenManager::_drawOtaChecking() {
 
 void ScreenManager::_drawOtaResult() {
     _lcd.setCursor(0, 0); _lcd.print("--- FW Update ------");
+    char row[32];
     if (!_sm.otaCheckSuccess) {
         _lcd.setCursor(0, 1); _lcd.print("Check Failed!       ");
         _lcd.setCursor(0, 2); _lcd.print("Cannot connect svr. ");
         _lcd.setCursor(0, 3); _lcd.print("Click to go back    ");
     } else if (_sm.otaHasUpdate) {
-        _lcd.setCursor(0, 1); _lcd.print("New: "); _lcd.print(_sm.otaLatestVersion);
-        _lcd.setCursor(0, 2); _lcd.print("Cur: "); _lcd.print(FW_VERSION);
+        // เวอร์ชันมาจาก server ความยาวไม่แน่นอน → ตัดที่ 15 ตัว
+        snprintf(row, sizeof(row), "New: %.15s", _sm.otaLatestVersion.c_str()); _printRow(_lcd, 1, row);
+        snprintf(row, sizeof(row), "Cur: %.15s", FW_VERSION);                    _printRow(_lcd, 2, row);
         _lcd.setCursor(0, 3); _lcd.print("Hold 10s to Update! ");
     } else {
         _lcd.setCursor(0, 1); _lcd.print("System is up to date");
-        _lcd.setCursor(0, 2); _lcd.print("Cur: "); _lcd.print(FW_VERSION);
+        snprintf(row, sizeof(row), "Cur: %.15s", FW_VERSION);                    _printRow(_lcd, 2, row);
         _lcd.setCursor(0, 3); _lcd.print("Click to go back    ");
     }
 }

@@ -14,6 +14,7 @@
 #include "AlarmTask.h"
 #include "SimTask.h"
 #include "WifiTask.h"
+#include "ResetLog.h"
 
 // ==========================================
 // Task Configurations (Stack, Priority, Core)
@@ -93,6 +94,12 @@ void displayTask(void* param) {
 // SETUP
 // ==========================================
 void setup() {
+    // --- Serial (เดิมไม่ได้ begin → Serial.println ใน Task ต่างๆ ไม่ออก) ---
+    Serial.begin(115200);
+
+    // --- บันทึกสาเหตุการรีเซต + นับจำนวนครั้ง (ลง NVS namespace "rst_log") ---
+    ResetLog::begin();
+
     // --- Task Watchdog ---
     // ไม่ให้ WDT เฝ้า IDLE task (เหมือนที่ disableCore0WDT() ตั้งใจไว้เดิม)
     // แต่ใช้ reconfigure เพื่อให้ถอด idle hook ออกด้วย → ไม่มี log "task not found" รัว
